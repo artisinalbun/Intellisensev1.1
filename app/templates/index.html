@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>News Map</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <style>
+        #map {
+            height: 600px;
+            width: calc(100% - 35%);
+            float: left;
+            transition: width 0.5s;
+        }
+        .sidebar {
+            height: 600px;
+            overflow-y: auto;
+            padding: 10px;
+            float: left;
+            width: 35%;
+            transition: width 0.5s;
+        }
+        .sidebar .form-group {
+            margin-bottom: 10px;
+        }
+        .article-details {
+            white-space: pre-wrap;
+        }
+        .layer-buttons {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+        .layer-buttons .btn {
+            margin: 0 5px;
+        }
+        .filters-bar {
+            display: flex;
+            align-items: center;
+            margin-right: 10px;
+        }
+        .filters-bar .fa-plus {
+            color: grey;
+            font-size: 24px;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1050;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgb(0, 0, 0);
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 10% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 50%;
+            z-index: 1060;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .filter-icons {
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+        }
+        .filter-section {
+            padding: 10px 0;
+            border-top: 1px solid #ccc;
+        }
+        .tree {
+            list-style: none;
+            padding-left: 20px;
+            overflow-y: auto;
+            max-height: 200px;
+        }
+        .tree li {
+            margin: 5px 0;
+            cursor: pointer;
+        }
+        .tree li.selected {
+            background-color: #007bff;
+            color: white;
+        }
+        .action-buttons {
+            position: sticky;
+            bottom: 0;
+            background: white;
+            padding: 10px;
+        }
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+        }
+        .hidden {
+            display: none;
+        }
+
+        /* Radial Menu Styles */
+.radial-menu {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 250px;
+    height: 250px;
+    z-index: 1000;
+    cursor: grab; /* Indicate draggable area */
+}
+
+.radial-menu.hidden {
+    display: none;
+}
+
+.radial-menu svg {
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+}
+
+.radial-menu .radial-button {
+    transition: fill 0.3s ease;
+}
+
+.radial-menu .radial-button:hover {
+    fill: rgba(0, 123, 255, 0.5); /* Highlight color on hover */
+}
+
+.ticker {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    text-align: center;
+    font-size: 14px;
+    color: white;
+    z-index: 1001;
+    pointer-events: none; /* Ensure the ticker doesn't block clicks */
+}
+
+.draggable {
+    cursor: grab; /* Indicate draggable area */
+}
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div id="map"></div>
+            <div class="sidebar" id="sidebar">
+                <div class="layer-buttons">
+                    <button class="btn btn-secondary" id="newsLayer" title="News"><i class="fas fa-newspaper"></i></button>
+                    <button class="btn btn-secondary" id="peopleLayer" title="People"><i class="fas fa-user"></i></button>
+                    <button class="btn btn-secondary" id="organizationsLayer" title="Organizations"><i class="fas fa-building"></i></button>
+                    <button class="btn btn-secondary" id="multiFiltersLayer" title="Pipeline"><i class="fas fa-filter"></i></button>
+                </div>
+                <div id="articleDetails">
+                    <h2>Article Details</h2>
+                    <div class="form-group">
+                        <label for="articleHeadline">Headline</label>
+                        <p id="articleHeadline" class="form-control-static"></p>
+                    </div>
+                    <div class="form-group">
+                        <label for="articleID">Article ID</label>
+                        <p id="articleID" class="form-control-static"></p>
+                    </div>
+                    <div class="form-group">
+                        <label for="articleBody">Article Body</label>
+                        <div id="articleBody" class="article-details form-control-static"></div>
+                    </div>
+                </div>
+                <div id="peopleDetails" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h2>People</h2>
+                        <span class="close" id="closePeopleDetails">&times;</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="searchPeople">Search People</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="searchPeople" placeholder="Type to search..." onkeyup="filterPeople()">
+                            <div class="input-group-append">
+                                <button class="btn btn-secondary" type="button" title="Search" onclick="filterPeople()"><i class="fas fa-search"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="profileDropdown">Profiles</label>
+                        <select class="form-control" id="profileDropdown">
+                            <!-- Options will be loaded dynamically -->
+                        </select>
+                    </div>
+                    <ul class="tree" id="peopleTree">
+                        <!-- People tree will be populated here -->
+                    </ul>
+                    <div class="action-buttons">
+                        <button class="btn btn-secondary" id="addProfileBtn">Add Profile</button>
+                        <button class="btn btn-secondary" id="editProfileBtn" disabled>Edit Profile</button>
+                        <button class="btn btn-secondary" id="deleteProfileBtn" disabled>Delete Profile</button>
+                    </div>
+                </div>
+                <div id="addProfileDetails" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h2>Add Profile</h2>
+                        <span class="close" id="closeAddProfileDetails">&times;</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="firstName">First Name</label>
+                        <input type="text" class="form-control" id="firstName" placeholder="First Name">
+                    </div>
+                    <div class="form-group">
+                        <label for="lastName">Last Name</label>
+                        <input type="text" class="form-control" id="lastName" placeholder="Last Name">
+                    </div>
+                    <div class="form-group">
+                        <label for="address">Address</label>
+                        <input type="text" class="form-control" id="address" placeholder="Address">
+                    </div>
+                    <div class="form-group">
+                        <label for="address2">Address 2</label>
+                        <input type="text" class="form-control" id="address2" placeholder="Address 2">
+                    </div>
+                    <div class="form-group">
+                        <label for="city">City</label>
+                        <input type="text" class="form-control" id="city" placeholder="City">
+                    </div>
+                    <div class="form-group">
+                        <label for="state">State</label>
+                        <input type="text" class="form-control" id="state" placeholder="State">
+                    </div>
+                    <div class="form-group">
+                        <label for="zip">Zip</label>
+                        <input type="text" class="form-control" id="zip" placeholder="Zip">
+                    </div>
+                    <div class="form-group">
+                        <label for="country">Country</label>
+                        <select class="form-control" id="country">
+                            <!-- List of known countries will be populated here -->
+                        </select>
+                    </div>
+                    <button class="btn btn-secondary" id="saveProfileBtn">Save Profile</button>
+                </div>
+                <div id="editProfileDetails" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h2>Edit Profile</h2>
+                        <span class="close" id="closeEditProfileDetails">&times;</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="editFirstName">First Name</label>
+                        <input type="text" class="form-control" id="editFirstName" placeholder="First Name">
+                    </div>
+                    <div class="form-group">
+                        <label for="editLastName">Last Name</label>
+                        <input type="text" class="form-control" id="editLastName" placeholder="Last Name">
+                    </div>
+                    <div class="form-group">
+                        <label for="editAddress">Address</label>
+                        <input type="text" class="form-control" id="editAddress" placeholder="Address">
+                    </div>
+                    <div class="form-group">
+                        <label for="editAddress2">Address 2</label>
+                        <input type="text" class="form-control" id="editAddress2" placeholder="Address 2">
+                    </div>
+                    <div class="form-group">
+                        <label for="editCity">City</label>
+                        <input type="text" class="form-control" id="editCity" placeholder="City">
+                    </div>
+                    <div class="form-group">
+                        <label for="editState">State</label>
+                        <input type="text" class="form-control" id="editState" placeholder="State">
+                    </div>
+                    <div class="form-group">
+                        <label for="editZip">Zip</label>
+                        <input type="text" class="form-control" id="editZip" placeholder="Zip">
+                    </div>
+                    <div class="form-group">
+                        <label for="editCountry">Country</label>
+                        <select class="form-control" id="editCountry">
+                            <!-- List of known countries will be populated here -->
+                        </select>
+                    </div>
+                    <button class="btn btn-secondary" id="updateProfileBtn">Update Profile</button>
+                </div>
+                <div id="newsDetails" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h2>News</h2>
+                        <span class="close" id="closeNewsDetails">&times;</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="searchNews">Search Article Headlines</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="searchNews" placeholder="Type to search..." onkeyup="filterNews()">
+                            <div class="input-group-append">
+                                <button class="btn btn-secondary" type="button" title="Search" onclick="filterNews()"><i class="fas fa-search"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    <ul class="tree" id="newsTree" style="max-height: 200px; overflow-y: auto; display: none;">
+                        <!-- News tree will be populated here -->
+                    </ul>
+                    <button class="btn btn-secondary" id="advancedSearchBtn">Advanced Search</button>
+                </div>
+                <div id="advancedSearchDetails" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h2>Advanced Search</h2>
+                        <span class="close" id="closeAdvancedSearchDetails">&times;</span>
+                    </div>
+                    <!-- Advanced Search Form -->
+                    <div class="form-group">
+                        <label for="advancedSearchBox">Search</label>
+                        <input type="text" class="form-control" id="advancedSearchBox" placeholder="Type to search...">
+                    </div>
+                    <div class="form-group">
+                        <label for="searchBy">Search by</label>
+                        <div id="searchBy">
+                            <label><input type="radio" name="searchBy" value="headline" checked> Headlines</label>
+                            <label><input type="radio" name="searchBy" value="person"> Person</label>
+                            <label><input type="radio" name="searchBy" value="location"> Location</label>
+                            <label><input type="radio" name="searchBy" value="keyword"> Keyword</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Show Columns</label>
+                        <div>
+                            <label><input type="checkbox" id="showLocation" value="location" onchange="toggleColumnVisibility('location')"> Location</label>
+                            <label><input type="checkbox" id="showSource" value="source" checked onchange="toggleColumnVisibility('source')"> Source</label>
+                            <label><input type="checkbox" id="showPeople" value="people" onchange="toggleColumnVisibility('people')"> People</label>
+                            <label><input type="checkbox" id="showOrganizations" value="organizations" onchange="toggleColumnVisibility('organizations')"> Organizations</label>
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary" id="searchAdvancedBtn">Search</button>
+                    <div class="table-responsive">
+                        <table class="table table-striped" id="advancedSearchTable">
+                            <thead>
+                                <tr>
+                                    <th>Headline</th>
+                                    <th class="source-column">Source</th>
+                                    <th>Date</th>
+                                    <th class="location-column hidden">Location</th>
+                                    <th class="people-column hidden">People</th>
+                                    <th class="organizations-column hidden">Organizations</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Articles will be dynamically populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<!-- Radial Menu -->
+<div id="pipelineRadialMenu" class="radial-menu hidden">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+        <!-- Semi-transparent outer ring -->
+        <circle cx="200" cy="200" r="180" fill="rgba(0,0,0,0.5)" />
+
+        <!-- Button sections (with lower opacity) -->
+        <!-- Top button - Select -->
+        <path class="radial-button" id="selectScrapersBtn" d="M200,20 A180,180 0 0,1 380,200 L200,200 Z" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.25)" stroke-width="1" />
+        <text x="290" y="110" fill="white" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Select</text>
+
+        <!-- Right button - Load -->
+        <path class="radial-button" id="loadScrapersBtn" d="M380,200 A180,180 0 0,1 200,380 L200,200 Z" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.25)" stroke-width="1" />
+        <text x="290" y="290" fill="white" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Load</text>
+
+        <!-- Bottom button - Activate ML -->
+        <path class="radial-button" id="activateMLBtn" d="M200,380 A180,180 0 0,1 20,200 L200,200 Z" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.25)" stroke-width="1" />
+        <text x="110" y="290" fill="white" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Activate ML</text>
+
+        <!-- Left button - Run Pipeline -->
+        <path class="radial-button" id="runPipelineBtn" d="M20,200 A180,180 0 0,1 200,20 L200,200 Z" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.25)" stroke-width="1" />
+        <text x="110" y="110" fill="white" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Run Pipeline</text>
+
+        <!-- Clean inner circle (placed AFTER the button sections to cover intersection lines) -->
+        <circle class="draggable" cx="200" cy="200" r="80" fill="rgba(0,0,0,0.6)" />
+        <!-- Additional thin border ring around inner circle -->
+        <circle cx="200" cy="200" r="80" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1" />
+    </svg>
+    <div class="ticker" id="pipelineTicker">Pipeline Messages</div>
+</div>
+    <!-- Delete Profile Modal -->
+    <div id="deleteProfileModal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="closeDeleteProfileModal">&times;</span>
+            <h2>Delete Profile</h2>
+            <p>Are you sure you want to delete this profile?</p>
+            <button class="btn btn-danger" id="confirmDeleteProfileBtn">Yes</button>
+            <button class="btn btn-secondary" id="cancelDeleteProfileBtn">No</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <script>
+        let map;
+        let markers = [];
+        let defaultView = { lat: 51.505, lon: -0.09, zoom: 2 };
+        let peopleData = [];
+        let selectedPerson = null;
+        let selectedArticle = null;
+
+        // Initialize the map
+        function initMap() {
+            map = L.map('map').setView([defaultView.lat, defaultView.lon], defaultView.zoom);
+
+            // Add OpenStreetMap tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            // Fetch markers data from the backend and add markers to the map
+            fetchMarkers();
+
+            // Add map click event to reset view to default
+            map.on('click', function() {
+                map.setView([defaultView.lat, defaultView.lon], defaultView.zoom, {
+                    animate: true,
+                    duration: 1.0
+                });
+            });
+        }
+
+        // Fetch markers from the backend
+        function fetchMarkers() {
+            fetch('/app/get_markers')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Fetched markers:', data);
+                    markers = data.features.map(marker => {
+                        const { id, name, article_id } = marker.properties;
+                        const [lon, lat] = marker.geometry.coordinates;
+                        const leafletMarker = L.marker([lat, lon])
+                            .on('click', (e) => {
+                                showArticleDetails(article_id);
+                                map.setView(e.latlng, 6, {
+                                    animate: true,
+                                    duration: 1.0
+                                });
+                                L.DomEvent.stopPropagation(e);
+                            })
+                            .bindPopup(`<b>${name}</b>`);
+                        leafletMarker.addTo(map);
+                        return { id, name, lat, lon, article_id, leafletMarker };
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching markers:', error);
+                });
+        }
+
+        // Show article details in the sidebar
+        function showArticleDetails(article_id) {
+            fetch(`/app/get_article/${article_id}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('articleHeadline').textContent = data.headline;
+                    document.getElementById('articleID').textContent = article_id;
+                    document.getElementById('articleBody').textContent = data.body;
+                })
+                .catch(error => {
+                    console.error('Error fetching article details:', error);
+                });
+        }
+
+        // Toggle People details
+        document.getElementById('peopleLayer').onclick = function() {
+            document.getElementById('articleDetails').style.display = "none";
+            document.getElementById('peopleDetails').style.display = "block";
+            loadPeopleData();
+        }
+
+        document.getElementById('closePeopleDetails').onclick = function() {
+            document.getElementById('peopleDetails').style.display = "none";
+            document.getElementById('articleDetails').style.display = "block";
+            document.getElementById('map').style.width = "calc(100% - 35%)";
+            document.getElementById('sidebar').style.width = "35%";
+        }
+
+        document.getElementById('closeAddProfileDetails').onclick = function() {
+            document.getElementById('addProfileDetails').style.display = "none";
+            document.getElementById('peopleDetails').style.display = "block";
+        }
+
+        document.getElementById('closeEditProfileDetails').onclick = function() {
+            document.getElementById('editProfileDetails').style.display = "none";
+            document.getElementById('peopleDetails').style.display = "block";
+        }
+
+        document.getElementById('closeDeleteProfileModal').onclick = function() {
+            document.getElementById('deleteProfileModal').style.display = "none";
+        }
+
+        document.getElementById('cancelDeleteProfileBtn').onclick = function() {
+            document.getElementById('deleteProfileModal').style.display = "none";
+        }
+
+        document.getElementById('confirmDeleteProfileBtn').onclick = function() {
+            deleteProfile();
+            document.getElementById('deleteProfileModal').style.display = "none";
+        }
+
+        document.getElementById('addProfileBtn').onclick = function() {
+            document.getElementById('peopleDetails').style.display = "none";
+            document.getElementById('addProfileDetails').style.display = "block";
+            prefillProfileFields();
+        }
+
+        document.getElementById('editProfileBtn').onclick = function() {
+            document.getElementById('peopleDetails').style.display = "none";
+            document.getElementById('editProfileDetails').style.display = "block";
+            loadProfileFields();
+        }
+
+        document.getElementById('saveProfileBtn').onclick = function() {
+            saveProfile();
+        }
+
+        document.getElementById('updateProfileBtn').onclick = function() {
+            updateProfile();
+        }
+
+        // Load people data from the backend
+        function loadPeopleData() {
+            fetch('/app/get_people')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Fetched people:', data);
+                    peopleData = data;
+                    populatePeopleTree(data);
+                })
+                .catch(error => {
+                    console.error('Error fetching people:', error);
+                });
+        }
+
+        // Populate the people tree
+        function populatePeopleTree(data) {
+            const tree = document.getElementById('peopleTree');
+            tree.innerHTML = '';
+            data.forEach(person => {
+                const li = document.createElement('li');
+                li.textContent = person.name;
+                li.onclick = function() {
+                    selectPerson(person, li);
+                }
+                if (person.has_profile === 'Yes') {
+                    const profileIcon = document.createElement('i');
+                    profileIcon.className = 'fas fa-id-card';
+                    profileIcon.style.marginLeft = '10px';
+                    li.appendChild(profileIcon);
+                }
+                tree.appendChild(li);
+            });
+        }
+
+        // Filter people in the tree
+        function filterPeople() {
+            const searchValue = document.getElementById('searchPeople').value.toLowerCase();
+            const filteredPeople = peopleData.filter(person => person.name.toLowerCase().includes(searchValue));
+            populatePeopleTree(filteredPeople);
+        }
+
+        // Select a person in the tree
+        function selectPerson(person, li) {
+            if (selectedPerson) {
+                selectedPerson.element.classList.remove('selected');
+            }
+            selectedPerson = { person, element: li };
+            li.classList.add('selected');
+            document.getElementById('addProfileBtn').style.display = 'inline-block';
+            document.getElementById('editProfileBtn').disabled = person.has_profile !== 'Yes';
+            document.getElementById('deleteProfileBtn').disabled = person.has_profile !== 'Yes';
+        }
+
+        // Pre-fill profile fields based on selected person
+        function prefillProfileFields() {
+            if (!selectedPerson) {
+                document.getElementById('firstName').value = '';
+                document.getElementById('lastName').value = '';
+                return;
+            }
+            const nameParts = selectedPerson.person.name.split(' ');
+            document.getElementById('firstName').value = nameParts[0] || '';
+            document.getElementById('lastName').value = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+        }
+
+        // Load profile fields for editing
+        function loadProfileFields() {
+            if (!selectedPerson || selectedPerson.person.has_profile !== 'Yes') return;
+            fetch(`/app/get_profile/${selectedPerson.person.id}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('editFirstName').value = data.first_name;
+                    document.getElementById('editLastName').value = data.last_name;
+                    document.getElementById('editAddress').value = data.address;
+                    document.getElementById('editAddress2').value = data.address2;
+                    document.getElementById('editCity').value = data.city;
+                    document.getElementById('editState').value = data.state;
+                    document.getElementById('editZip').value = data.zip_code;
+                    document.getElementById('editCountry').value = data.country;
+                })
+                .catch(error => {
+                    console.error('Error fetching profile:', error);
+                });
+        }
+
+        // Save profile data
+        function saveProfile() {
+            const profileData = {
+                firstName: document.getElementById('firstName').value,
+                lastName: document.getElementById('lastName').value,
+                address: document.getElementById('address').value,
+                address2: document.getElementById('address2').value,
+                city: document.getElementById('city').value,
+                state: document.getElementById('state').value,
+                zip: document.getElementById('zip').value,
+                country: document.getElementById('country').value,
+                personId: selectedPerson ? selectedPerson.person.id : null
+            };
+
+            fetch('/app/save_profile', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(profileData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Profile saved successfully');
+                    document.getElementById('addProfileDetails').style.display = "none";
+                    document.getElementById('peopleDetails').style.display = "block";
+                    loadPeopleData();
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error saving profile:', error);
+                alert('An error occurred while saving the profile');
+            });
+        }
+
+        // Update profile data
+        function updateProfile() {
+            const profileData = {
+                firstName: document.getElementById('editFirstName').value,
+                lastName: document.getElementById('editLastName').value,
+                address: document.getElementById('editAddress').value,
+                address2: document.getElementById('editAddress2').value,
+                city: document.getElementById('editCity').value,
+                state: document.getElementById('editState').value,
+                zip: document.getElementById('editZip').value,
+                country: document.getElementById('editCountry').value,
+                personId: selectedPerson ? selectedPerson.person.id : null
+            };
+
+            fetch('/app/save_profile', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(profileData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Profile updated successfully');
+                    document.getElementById('editProfileDetails').style.display = "none";
+                    document.getElementById('peopleDetails').style.display = "block";
+                    loadPeopleData();
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error updating profile:', error);
+                alert('An error occurred while updating the profile');
+            });
+        }
+
+        // Delete profile data
+        function deleteProfile() {
+            if (!selectedPerson || selectedPerson.person.has_profile !== 'Yes') return;
+            fetch(`/app/delete_profile/${selectedPerson.person.id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Profile deleted successfully');
+                    loadPeopleData();
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error deleting profile:', error);
+                alert('An error occurred while deleting the profile');
+            });
+        }
+
+        // Toggle News details
+        document.getElementById('newsLayer').onclick = function() {
+            document.getElementById('articleDetails').style.display = "none";
+            document.getElementById('peopleDetails').style.display = "none";
+            document.getElementById('newsDetails').style.display = "block";
+            loadNewsData();
+        }
+
+        document.getElementById('closeNewsDetails').onclick = function() {
+            document.getElementById('newsDetails').style.display = "none";
+            document.getElementById('articleDetails').style.display = "block";
+            document.getElementById('map').style.width = "calc(100% - 35%)";
+            document.getElementById('sidebar').style.width = "35%";
+        }
+
+        // Load news data from the backend
+        function loadNewsData() {
+            fetch('/app/get_articles')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Fetched articles:', data); // Debugging: Inspect the fetched data
+                    populateNewsTree(data);
+                })
+                .catch(error => {
+                    console.error('Error fetching articles:', error);
+                });
+        }
+
+        // Populate the news tree
+        function populateNewsTree(data) {
+            const tree = document.getElementById('newsTree');
+            tree.innerHTML = '';
+            data.forEach(article => {
+                const li = document.createElement('li');
+                li.textContent = `${article.headline} (${article.date})`;
+
+                // Add an "open" icon next to the article
+                const openIcon = document.createElement('i');
+                openIcon.className = 'fas fa-external-link-alt';
+                openIcon.style.marginLeft = '10px';
+                openIcon.style.cursor = 'pointer';
+                openIcon.style.fontSize = '12px'; // Make the icon small
+                openIcon.onclick = function(event) {
+                    event.stopPropagation(); // Prevent the li click event from firing
+                    openArticleDetails(article);
+                };
+
+                li.appendChild(openIcon);
+                li.onclick = function() {
+                    selectArticle(article, li);
+                };
+                tree.appendChild(li);
+            });
+            tree.style.display = 'none'; // Hide the tree initially
+        }
+
+        // Function to open article details in a new window
+        function openArticleDetails(article) {
+            console.log('Article data:', article); // Debugging: Inspect the article object
+
+            if (!article || !article.headline || !article.body) {
+            console.error('Invalid article data:', article);
+            alert('Unable to open article details. Invalid data.');
+            return;
+        }
+
+        const newWindow = window.open('', '_blank', 'width=600,height=400');
+        newWindow.document.write(`
+            <html>
+                <head>
+                    <title>${article.headline}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; }
+                        h1 { font-size: 20px; font-weight: bold; }
+                        p { margin: 10px 0; }
+                    </style>
+                </head>
+                <body>
+                    <h1>${article.headline}</h1>
+                    <p><strong>Source:</strong> ${article.source || 'N/A'}</p>
+                    <p><strong>Date:</strong> ${article.date || 'N/A'}</p>
+                    <p><strong>People Mentioned:</strong> ${article.people ? article.people.join(', ') : 'N/A'} (${article.num_people || 0})</p>
+                    <p><strong>Locations Mentioned:</strong> ${article.locations ? article.locations.join(', ') : 'N/A'} (${article.num_locations || 0})</p>
+                    <p><strong>Organizations Mentioned:</strong> ${article.organizations ? article.organizations.join(', ') : 'N/A'} (${article.num_organizations || 0})</p>
+                    <p><strong>Body:</strong></p>
+                    <p>${article.body}</p>
+                    <p><strong>URL:</strong> <a href="${article.url}" target="_blank">${article.url}</a></p>
+                </body>
+            </html>
+        `);
+        newWindow.document.close();
+}
+
+        // Function to select an article in the tree
+        function selectArticle(article, li) {
+            if (selectedArticle) {
+                selectedArticle.element.classList.remove('selected');
+            }
+            selectedArticle = { article, element: li };
+            li.classList.add('selected');
+        }
+
+        // Show the article tree when the search box is clicked
+        document.getElementById('searchNews').onclick = function() {
+            document.getElementById('newsTree').style.display = 'block';
+        };
+
+        // Hide the article tree when clicking outside of it
+        document.addEventListener('click', function(event) {
+            const newsTree = document.getElementById('newsTree');
+            const searchBox = document.getElementById('searchNews');
+            if (event.target !== newsTree && !newsTree.contains(event.target) && event.target !== searchBox) {
+                newsTree.style.display = 'none';
+            }
+        });
+
+        // Filter news in the tree
+        function filterNews() {
+            const searchValue = document.getElementById('searchNews').value.toLowerCase();
+            fetch(`/app/search_articles?query=${searchValue}`)
+                .then(response => response.json())
+                .then(data => {
+                    populateNewsTree(data);
+                })
+                .catch(error => {
+                    console.error('Error searching articles:', error);
+                });
+        }
+
+        // Toggle Advanced Search modal
+        document.getElementById('advancedSearchBtn').onclick = function() {
+            document.getElementById('newsDetails').style.display = "none";
+            document.getElementById('advancedSearchDetails').style.display = "block";
+            document.getElementById('map').style.width = "65%";
+            document.getElementById('sidebar').style.width = "35%";
+            loadAdvancedSearchTable();
+            // Initialize width based on currently checked columns
+            setTimeout(adjustSidebarWidth, 100); // Short delay to ensure table is populated
+        }
+
+        document.getElementById('closeAdvancedSearchDetails').onclick = function() {
+            document.getElementById('advancedSearchDetails').style.display = "none";
+            document.getElementById('newsDetails').style.display = "block";
+            document.getElementById('map').style.width = "calc(100% - 35%)";
+            document.getElementById('sidebar').style.width = "35%";
+        }
+
+        // Load advanced search table data from the backend
+        function loadAdvancedSearchTable() {
+            fetch('/app/get_articles')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Fetched articles for advanced search:', data);
+                    populateAdvancedSearchTable(data);
+                })
+                .catch(error => {
+                    console.error('Error fetching articles for advanced search:', error);
+                });
+        }
+
+        // Populate the advanced search table
+        function populateAdvancedSearchTable(data) {
+            const table = document.getElementById('advancedSearchTable').getElementsByTagName('tbody')[0];
+            table.innerHTML = '';
+            data.forEach(article => {
+                const row = table.insertRow();
+                row.insertCell(0).textContent = article.headline;
+                row.insertCell(1).textContent = article.source;
+                row.insertCell(2).textContent = article.date;
+                row.insertCell(3).textContent = article.locations;
+                row.insertCell(4).textContent = article.people;
+                row.insertCell(5).textContent = article.organizations;
+
+                // Add class names to the data cells
+                row.cells[1].classList.add('source-column');
+                row.cells[3].classList.add('location-column');
+                row.cells[4].classList.add('people-column');
+                row.cells[5].classList.add('organizations-column');
+
+                // Initially hide columns based on checkbox state
+                if (!document.getElementById('showSource').checked) {
+                    row.cells[1].classList.add('hidden');
+                }
+                if (!document.getElementById('showLocation').checked) {
+                    row.cells[3].classList.add('hidden');
+                }
+                if (!document.getElementById('showPeople').checked) {
+                    row.cells[4].classList.add('hidden');
+                }
+                if (!document.getElementById('showOrganizations').checked) {
+                    row.cells[5].classList.add('hidden');
+                }
+            });
+        }
+
+        // Perform advanced search
+        document.getElementById('searchAdvancedBtn').onclick = function() {
+            const query = document.getElementById('advancedSearchBox').value;
+            const searchBy = document.querySelector('input[name="searchBy"]:checked').value;
+            fetch(`/app/search_articles?query=${query}&search_by=${searchBy}`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Fetched advanced search results:', data);
+                    populateAdvancedSearchTable(data);
+                })
+                .catch(error => {
+                    console.error('Error performing advanced search:', error);
+                });
+        }
+
+        // Toggle column visibility based on checkboxes
+        function toggleColumnVisibility(columnClass) {
+            const isChecked = document.getElementById(`show${capitalizeFirstLetter(columnClass)}`).checked;
+            const headerElements = document.querySelectorAll(`.${columnClass}-column`);
+            const dataElements = document.querySelectorAll(`td.${columnClass}-column`);
+
+            // Toggle visibility of header elements
+            headerElements.forEach(el => {
+                if (isChecked) {
+                    el.classList.remove('hidden');
+                } else {
+                    el.classList.add('hidden');
+                }
+            });
+
+            // Toggle visibility of data elements
+            dataElements.forEach(el => {
+                if (isChecked) {
+                    el.classList.remove('hidden');
+                } else {
+                    el.classList.add('hidden');
+                }
+            });
+
+            // Adjust sidebar width based on visible columns
+            adjustSidebarWidth();
+        }
+
+        // Function to adjust sidebar width based on visible columns
+        function adjustSidebarWidth() {
+            const sidebar = document.getElementById('sidebar');
+            const table = document.getElementById('advancedSearchTable');
+            const visibleColumns = table.querySelectorAll('th:not(.hidden)').length;
+
+            // Base width on number of visible columns with a minimum of 35% and maximum of 75%
+            const sidebarWidthPercentage = Math.max(35, Math.min(75, visibleColumns * 10));
+            sidebar.style.width = `${sidebarWidthPercentage}%`;
+
+            // Adjust map width accordingly
+            const map = document.getElementById('map');
+            map.style.width = `calc(100% - ${sidebarWidthPercentage}%)`;
+        }
+
+        function capitalizeFirstLetter(string) {
+            return string.charAt(0).toUpperCase() + string.slice(1);
+        }
+
+        // Radial Menu Functionality
+        document.getElementById('multiFiltersLayer').onclick = function() {
+            const radialMenu = document.getElementById('pipelineRadialMenu');
+            radialMenu.classList.toggle('hidden');
+        };
+        // Add event listeners to SVG paths
+        document.getElementById('selectScrapersBtn').onclick = function() {
+            updateTicker('Selecting scrapers...');
+        };
+
+        document.getElementById('loadScrapersBtn').onclick = function() {
+            fetch('/app/load_scraper', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ scraper_name: 'news_scraper' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    updateTicker('All Scrapers Loaded');
+                } else {
+                    updateTicker(`Error: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error loading scrapers:', error);
+                updateTicker('Error loading scrapers');
+            });
+        };
+
+        document.getElementById('activateMLBtn').onclick = function() {
+            const isActive = document.getElementById('activateMLBtn').classList.toggle('active');
+            fetch('/app/toggle_ml_model', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ ml_model_active: isActive })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    updateTicker('ML Channel Activated');
+                } else {
+                    updateTicker(`Error: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error toggling ML model:', error);
+                updateTicker('Error toggling ML model');
+            });
+        };
+
+        document.getElementById('runPipelineBtn').onclick = function() {
+            fetch('/app/data_refresh', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    updateTicker('Pipeline Running...');
+                    fetchMarkers();  // Reload markers on the map
+                    loadNewsData();  // Reload articles in the sidebar
+                } else {
+                    updateTicker(`Error: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error running pipeline:', error);
+                updateTicker('Error running pipeline');
+            });
+        };
+
+        // Ticker Functionality
+        let tickerMessages = [];
+        let tickerIndex = 0;
+
+        function updateTicker(message) {
+            tickerMessages.push(message);
+            const ticker = document.getElementById('pipelineTicker');
+            ticker.textContent = message;
+        }
+
+        function cycleTicker() {
+            if (tickerMessages.length === 0) return;
+            const ticker = document.getElementById('pipelineTicker');
+            ticker.textContent = tickerMessages[tickerIndex];
+            tickerIndex = (tickerIndex + 1) % tickerMessages.length;
+        }
+
+        setInterval(cycleTicker, 5000); // Cycle messages every 5 seconds
+
+        // Select Scrapers
+        document.getElementById('selectScrapersBtn').onclick = function() {
+            // Open file explorer (to be implemented)
+            updateTicker('Selecting scrapers...');
+        };
+
+        // Load Scrapers
+        document.getElementById('loadScrapersBtn').onclick = function() {
+            fetch('/app/load_scraper', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ scraper_name: 'news_scraper' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    updateTicker('All Scrapers Loaded');
+                } else {
+                    updateTicker(`Error: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error loading scrapers:', error);
+                updateTicker('Error loading scrapers');
+            });
+        };
+
+        // Activate ML Channel
+        document.getElementById('activateMLBtn').onclick = function() {
+            const isActive = document.getElementById('activateMLBtn').classList.toggle('active');
+            fetch('/app/toggle_ml_model', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ ml_model_active: isActive })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    updateTicker('ML Channel Activated');
+                } else {
+                    updateTicker(`Error: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error toggling ML model:', error);
+                updateTicker('Error toggling ML model');
+            });
+        };
+
+        // Run Pipeline
+        document.getElementById('runPipelineBtn').onclick = function() {
+            fetch('/app/data_refresh', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    updateTicker('Pipeline Running...');
+                    fetchMarkers();  // Reload markers on the map
+                    loadNewsData();  // Reload articles in the sidebar
+                } else {
+                    updateTicker(`Error: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error running pipeline:', error);
+                updateTicker('Error running pipeline');
+            });
+        };
+
+        // Initialize the map and load data
+        document.addEventListener('DOMContentLoaded', function() {
+            initMap();
+        });
+
+        // Drag functionality for the radial menu
+        const radialMenu = document.getElementById('pipelineRadialMenu');
+        let isDragging = false;
+        let offsetX, offsetY;
+
+        // Event listener for mouse down on the inner circle
+        radialMenu.querySelector('.draggable').addEventListener('mousedown', (e) => {
+            isDragging = true;
+            offsetX = e.clientX - radialMenu.offsetLeft;
+            offsetY = e.clientY - radialMenu.offsetTop;
+            radialMenu.style.cursor = 'grabbing'; // Change cursor to grabbing
+        });
+
+        // Event listener for mouse move
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                radialMenu.style.left = `${e.clientX - offsetX}px`;
+                radialMenu.style.top = `${e.clientY - offsetY}px`;
+            }
+        });
+
+        // Event listener for mouse up
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                radialMenu.style.cursor = 'grab'; // Change cursor back to grab
+            }
+        });
+
+        // Prevent text selection while dragging
+        document.addEventListener('selectstart', (e) => {
+            if (isDragging) {
+                e.preventDefault();
+            }
+        });
+    </script>
+</body>
+</html>

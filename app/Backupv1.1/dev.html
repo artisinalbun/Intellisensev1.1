@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Location Trace Tool</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <style>
+        body, html {
+            font-size: 0.9rem;
+        }
+        .table-responsive {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        td, th {
+            padding: 0.25rem;
+        }
+        .trace-result {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            position: relative;
+        }
+        .trace-result pre {
+            margin: 0;
+            padding: 0.5rem;
+            font-size: 0.8rem;
+        }
+        .toggle-button {
+            position: absolute;
+            top: 0;
+            right: 0;
+            margin: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-3">
+        <h1 class="mb-3">Location Trace Tool</h1>
+        <form id="traceForm">
+            <div class="form-group row">
+                <label for="article_id" class="col-sm-2 col-form-label">Article ID:</label>
+                <div class="col-sm-4">
+                    <input type="number" class="form-control" id="article_id" name="article_id">
+                </div>
+            </div>
+            <div class="form-group row">
+                <label for="headline" class="col-sm-2 col-form-label">Headline:</label>
+                <div class="col-sm-10">
+                    <input type="text" class="form-control" id="headline" name="headline">
+                </div>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="traceLocation()">Trace Location</button>
+            <button type="button" class="btn btn-secondary" onclick="openAnnotateWindow()">Annotate</button>
+            <button type="button" class="btn btn-secondary" onclick="openTrainingWindow()">Training</button>
+        </form>
+        <h2 class="mt-3">Trace Result:</h2>
+        <div id="traceResult" class="trace-result mt-1">
+            <button class="btn btn-secondary btn-sm toggle-button" onclick="toggleTraceResult()">Minimize</button>
+            <pre></pre>
+        </div>
+
+        <h2 class="mt-3">Articles</h2>
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="filterNoMarkers" onchange="fetchArticles()">
+            <label class="form-check-label" for="filterNoMarkers">
+                Show only articles without map markers
+            </label>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm mt-1" id="articlesTable">
+                <thead class="thead-light">
+                    <tr>
+                        <th scope="col"><input type="checkbox" id="selectAll" onclick="selectAllArticles()"></th>
+                        <th scope="col">ID</th>
+                        <th scope="col">Headline</th>
+                        <th scope="col">Body</th>
+                        <th scope="col">Date</th>
+                        <th scope="col">People</th>
+                        <th scope="col">Locations</th>
+                        <th scope="col">Organizations</th>
+                        <th scope="col">Map Marker</th> <!-- Replaced column -->
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+        <button class="btn btn-warning mt-2" onclick="reprocessSelectedArticles()">Reprocess Selected Articles</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchArticles();
+        });
+
+        function traceLocation() {
+            const articleId = document.getElementById("article_id").value;
+            const headline = document.getElementById("headline").value;
+            const payload = { article_id: articleId, headline: headline };
+
+            console.log("Sending request to /dev/trace_location with payload:", payload);
+
+            fetch("/dev/trace_location", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(response => {
+                console.log("Response status:", response.status);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log("Response data:", data);
+                const traceResult = document.getElementById("traceResult").querySelector("pre");
+                traceResult.textContent = JSON.stringify(data, null, 2);
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                const traceResult = document.getElementById("traceResult").querySelector("pre");
+                traceResult.textContent = `Error: ${error.message}`;
+            });
+        }
+
+        function fetchArticles() {
+            const filterNoMarkers = document.getElementById("filterNoMarkers").checked;
+            console.log("Fetching articles with filter_no_markers:", filterNoMarkers);
+
+            fetch(`/dev/articles?filter_no_markers=${filterNoMarkers}`)
+            .then(response => response.json())
+            .then(data => {
+                console.log("Fetched articles:", data);
+                const tbody = document.getElementById("articlesTable").querySelector("tbody");
+                tbody.innerHTML = "";
+                
+                data.forEach(article => {
+                    const tr = document.createElement("tr");
+                    tr.onclick = () => {
+                        document.getElementById("article_id").value = article.id;
+                        traceLocation();
+                    };
+                    tr.innerHTML = `
+                        <td><input type="checkbox" class="article-checkbox" value="${article.id}"></td>
+                        <td>${article.id}</td>
+                        <td>${article.headline}</td>
+                        <td>${truncateAfterFirstSentence(article.body)}</td>
+                        <td>${article.date}</td>
+                        <td>${article.people}</td>
+                        <td>${article.locations}</td>
+                        <td>${article.organizations}</td>
+                        <td>${article.has_marker}</td> <!-- Display map marker status -->
+                    `;
+                    tbody.appendChild(tr);
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching articles:', error);
+            });
+        }
+
+        function truncateAfterFirstSentence(text) {
+            const firstSentenceEnd = text.indexOf('.') + 1;
+            return text.substring(0, firstSentenceEnd);
+        }
+
+        function toggleTraceResult() {
+            const traceResult = document.getElementById("traceResult");
+            const toggleButton = traceResult.querySelector(".toggle-button");
+            const pre = traceResult.querySelector("pre");
+
+            if (pre.style.display === "none") {
+                pre.style.display = "block";
+                toggleButton.textContent = "Minimize";
+            } else {
+                pre.style.display = "none";
+                toggleButton.textContent = "Maximize";
+            }
+        }
+
+        function selectAllArticles() {
+            const selectAllCheckbox = document.getElementById("selectAll");
+            const articleCheckboxes = document.querySelectorAll(".article-checkbox");
+            articleCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+        }
+
+        function reprocessSelectedArticles() {
+            const selectedArticleIds = [];
+            const articleCheckboxes = document.querySelectorAll(".article-checkbox:checked");
+            articleCheckboxes.forEach(checkbox => {
+                selectedArticleIds.push(parseInt(checkbox.value));
+            });
+
+            console.log("Reprocessing articles with IDs:", selectedArticleIds);
+
+            fetch("/dev/reprocess_articles", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ article_ids: selectedArticleIds })
+            })
+            .then(response => {
+                console.log("Response status:", response.status);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log("Reprocessed articles result:", data);
+                const traceResult = document.getElementById("traceResult").querySelector("pre");
+                traceResult.textContent = JSON.stringify(data, null, 2);
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                const traceResult = document.getElementById("traceResult").querySelector("pre");
+                traceResult.textContent = `Error: ${error.message}`;
+            });
+        }
+
+        function openAnnotateWindow() {
+            window.open("/dev/annotate", "_blank", "width=1000,height=600");
+        }
+
+        function openTrainingWindow() {
+            window.open("/dev/training", "_blank", "width=1000,height=600");
+        }
+    </script>
+</body>
+</html>

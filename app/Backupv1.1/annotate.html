@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Annotate Articles</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <style>
+        body, html {
+            font-size: 0.9rem;
+        }
+        .table-responsive {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        td, th {
+            padding: 0.25rem;
+        }
+        .full-text {
+            white-space: pre-wrap;
+        }
+        .article-link {
+            text-decoration: underline;
+            color: blue;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-3">
+        <h1 class="mb-3">Annotate Articles</h1>
+        <div class="table-responsive">
+            <table class="table table-sm mt-1" id="mlArticlesTable">
+                <thead class="thead-light">
+                    <tr>
+                        <th scope="col">ID</th>
+                        <th scope="col">Correct Location</th>
+                        <th scope="col">Headline</th>
+                        <th scope="col">Body</th>
+                        <th scope="col">Link</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+        <button class="btn btn-primary mt-2" onclick="saveAnnotations()">Save</button>
+        <button class="btn btn-secondary mt-2" onclick="window.close()">Close</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchMLArticles();
+        });
+
+        function fetchMLArticles() {
+            fetch('/dev/ml_articles')
+            .then(response => response.json())
+            .then(data => {
+                const tbody = document.getElementById("mlArticlesTable").querySelector("tbody");
+                tbody.innerHTML = "";
+                
+                data.forEach(article => {
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td>${article.id}</td>
+                        <td><input type="text" class="form-control" value="${article.correct_location || ''}" data-article-id="${article.id}"></td>
+                        <td>${article.headline}</td>
+                        <td class="full-text">${article.body}</td>
+                        <td><a href="${article.url}" target="_blank" class="article-link">View Article</a></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching ml_articles:', error);
+            });
+        }
+
+        function saveAnnotations() {
+            const inputs = document.querySelectorAll('#mlArticlesTable input[data-article-id]');
+            const annotations = Array.from(inputs).map(input => ({
+                id: input.getAttribute('data-article-id'),
+                correct_location: input.value
+            }));
+
+            fetch('/dev/save_annotations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ annotations })
+            })
+            .then(response => {
+                if (response.ok) {
+                    alert('Annotations saved successfully.');
+                } else {
+                    alert('Failed to save annotations.');
+                }
+            })
+            .catch(error => {
+                console.error('Error saving annotations:', error);
+                alert('Error saving annotations.');
+            });
+        }
+    </script>
+</body>
+</html>

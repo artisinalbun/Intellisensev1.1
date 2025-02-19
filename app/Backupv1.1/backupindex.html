@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>News Map</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <style>
+        #map {
+            height: 600px;
+            width: 100%;
+        }
+        .sidebar {
+            height: 600px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        .sidebar .form-group {
+            margin-bottom: 10px;
+        }
+        .article-details {
+            white-space: pre-wrap; /* Preserve whitespace in the article body */
+        }
+        .layer-buttons {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+        .layer-buttons .btn {
+            margin: 0 5px;
+        }
+        .filters-bar {
+            display: flex;
+            align-items: center;
+            margin-right: 10px;
+        }
+        .filters-bar .fa-plus {
+            color: grey;
+            font-size: 24px;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1050;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgb(0, 0, 0);
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 10% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 50%;
+            z-index: 1060;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .filter-icons {
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+        }
+        .filter-section {
+            padding: 10px 0;
+            border-top: 1px solid #ccc;
+        }
+        .tree {
+            list-style: none;
+            padding-left: 20px;
+            overflow-y: auto;
+            max-height: 400px;
+        }
+        .tree li {
+            margin: 5px 0;
+            cursor: pointer;
+        }
+        .tree li.selected {
+            background-color: #007bff;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-8">
+                <div id="map"></div>
+            </div>
+            <div class="col-md-4">
+                <div class="sidebar">
+                    <div class="layer-buttons">
+                        <button class="btn btn-secondary" id="newsLayer" title="News"><i class="fas fa-newspaper"></i></button>
+                        <button class="btn btn-secondary" id="peopleLayer" title="People"><i class="fas fa-user"></i></button>
+                        <button class="btn btn-secondary" id="organizationsLayer" title="Organizations"><i class="fas fa-building"></i></button>
+                        <button class="btn btn-secondary" id="configLayer" title="Config"><i class="fas fa-cog"></i></button>
+                        <button class="btn btn-secondary" id="multiFiltersLayer" title="Multi-Filters"><i class="fas fa-filter"></i></button>
+                    </div>
+                    <div id="articleDetails">
+                        <h2>Article Details</h2>
+                        <div class="form-group">
+                            <label for="articleHeadline">Headline</label>
+                            <p id="articleHeadline" class="form-control-static"></p>
+                        </div>
+                        <div class="form-group">
+                            <label for="articleID">Article ID</label>
+                            <p id="articleID" class="form-control-static"></p>
+                        </div>
+                        <div class="form-group">
+                            <label for="articleBody">Article Body</label>
+                            <div id="articleBody" class="article-details form-control-static"></div>
+                        </div>
+                    </div>
+                    <div id="peopleDetails" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h2>People</h2>
+                            <span class="close" id="closePeopleDetails">&times;</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="searchPeople">Search People</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="searchPeople" placeholder="Type to search..." onkeyup="filterPeople()">
+                                <div class="input-group-append">
+                                    <button class="btn btn-secondary" type="button" title="Search" onclick="filterPeople()"><i class="fas fa-search"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="profileDropdown">Profiles</label>
+                            <select class="form-control" id="profileDropdown">
+                                <!-- Options will be loaded dynamically -->
+                            </select>
+                        </div>
+                        <ul class="tree" id="peopleTree">
+                            <!-- People tree will be populated here -->
+                        </ul>
+                        <button class="btn btn-secondary" id="addProfileBtn">Add Profile</button>
+                        <button class="btn btn-secondary" id="editProfileBtn" disabled>Edit Profile</button>
+                    </div>
+                    <div id="addProfileDetails" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h2>Add Profile</h2>
+                            <span class="close" id="closeAddProfileDetails">&times;</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="firstName">First Name</label>
+                            <input type="text" class="form-control" id="firstName" placeholder="First Name">
+                        </div>
+                        <div class="form-group">
+                            <label for="lastName">Last Name</label>
+                            <input type="text" class="form-control" id="lastName" placeholder="Last Name">
+                        </div>
+                        <div class="form-group">
+                            <label for="address">Address</label>
+                            <input type="text" class="form-control" id="address" placeholder="Address">
+                        </div>
+                        <div class="form-group">
+                            <label for="address2">Address 2</label>
+                            <input type="text" class="form-control" id="address2" placeholder="Address 2">
+                        </div>
+                        <div class="form-group">
+                            <label for="city">City</label>
+                            <input type="text" class="form-control" id="city" placeholder="City">
+                        </div>
+                        <div class="form-group">
+                            <label for="state">State</label>
+                            <input type="text" class="form-control" id="state" placeholder="State">
+                        </div>
+                        <div class="form-group">
+                            <label for="zip">Zip</label>
+                            <input type="text" class="form-control" id="zip" placeholder="Zip">
+                        </div>
+                        <div class="form-group">
+                            <label for="country">Country</label>
+                            <select class="form-control" id="country">
+                                <!-- List of known countries will be populated here -->
+                            </select>
+                        </div>
+                        <button class="btn btn-secondary" id="saveProfileBtn">Save Profile</button>
+                    </div>
+                    <div id="editProfileDetails" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h2>Edit Profile</h2>
+                            <span class="close" id="closeEditProfileDetails">&times;</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="editFirstName">First Name</label>
+                            <input type="text" class="form-control" id="editFirstName" placeholder="First Name">
+                        </div>
+                        <div class="form-group">
+                            <label for="editLastName">Last Name</label>
+                            <input type="text" class="form-control" id="editLastName" placeholder="Last Name">
+                        </div>
+                        <div class="form-group">
+                            <label for="editAddress">Address</label>
+                            <input type="text" class="form-control" id="editAddress" placeholder="Address">
+                        </div>
+                        <div class="form-group">
+                            <label for="editAddress2">Address 2</label>
+                            <input type="text" class="form-control" id="editAddress2" placeholder="Address 2">
+                        </div>
+                        <div class="form-group">
+                            <label for="editCity">City</label>
+                            <input type="text" class="form-control" id="editCity" placeholder="City">
+                        </div>
+                        <div class="form-group">
+                            <label for="editState">State</label>
+                            <input type="text" class="form-control" id="editState" placeholder="State">
+                        </div>
+                        <div class="form-group">
+                            <label for="editZip">Zip</label>
+                            <input type="text" class="form-control" id="editZip" placeholder="Zip">
+                        </div>
+                        <div class="form-group">
+                            <label for="editCountry">Country</label>
+                            <select class="form-control" id="editCountry">
+                                <!-- List of known countries will be populated here -->
+                            </select>
+                        </div>
+                        <button class="btn btn-secondary" id="updateProfileBtn">Update Profile</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <script>
+        let map;
+        let markers = [];
+        let defaultView = { lat: 51.505, lon: -0.09, zoom: 2 };
+        let peopleData = [];
+        let selectedPerson = null;
+
+        // Initialize the map
+        function initMap() {
+            map = L.map('map').setView([defaultView.lat, defaultView.lon], defaultView.zoom); // Default view (can be changed)
+
+            // Add OpenStreetMap tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            // Fetch markers data from the backend and add markers to the map
+            fetchMarkers();
+
+            // Add map click event to reset view to default
+            map.on('click', function() {
+                map.setView([defaultView.lat, defaultView.lon], defaultView.zoom, {
+                    animate: true,
+                    duration: 1.0
+                });
+            });
+        }
+
+        // Fetch markers from the backend
+        function fetchMarkers() {
+            fetch('/app/get_markers')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Fetched markers:', data);
+                    markers = data.features.map(marker => {
+                        const { id, name, article_id } = marker.properties;
+                        const [lon, lat] = marker.geometry.coordinates;
+                        const leafletMarker = L.marker([lat, lon])
+                            .on('click', (e) => {
+                                showArticleDetails(article_id);
+                                map.setView(e.latlng, 6, { // Zoom in a little less (level 6 instead of 10)
+                                    animate: true,
+                                    duration: 1.0 // Smooth zooming
+                                });
+                                L.DomEvent.stopPropagation(e); // Prevent map click event from firing
+                            })
+                            .bindPopup(`<b>${name}</b>`);
+                        leafletMarker.addTo(map);
+                        return { id, name, lat, lon, article_id, leafletMarker };
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching markers:', error);
+                });
+        }
+
+        // Show article details in the sidebar
+        function showArticleDetails(article_id) {
+            fetch(`/app/get_article/${article_id}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('articleHeadline').textContent = data.headline;
+                    document.getElementById('articleID').textContent = article_id;
+                    document.getElementById('articleBody').textContent = data.body;
+                })
+                .catch(error => {
+                    console.error('Error fetching article details:', error);
+                });
+        }
+
+        // Toggle People details
+        document.getElementById('peopleLayer').onclick = function() {
+            document.getElementById('articleDetails').style.display = "none";
+            document.getElementById('peopleDetails').style.display = "block";
+            loadPeopleData();
+        }
+
+        document.getElementById('closePeopleDetails').onclick = function() {
+            document.getElementById('peopleDetails').style.display = "none";
+            document.getElementById('articleDetails').style.display = "block";
+        }
+
+        document.getElementById('closeAddProfileDetails').onclick = function() {
+            document.getElementById('addProfileDetails').style.display = "none";
+            document.getElementById('peopleDetails').style.display = "block";
+        }
+
+        document.getElementById('closeEditProfileDetails').onclick = function() {
+            document.getElementById('editProfileDetails').style.display = "none";
+            document.getElementById('peopleDetails').style.display = "block";
+        }
+
+        document.getElementById('addProfileBtn').onclick = function() {
+            document.getElementById('peopleDetails').style.display = "none";
+            document.getElementById('addProfileDetails').style.display = "block";
+            prefillProfileFields();
+        }
+
+        document.getElementById('editProfileBtn').onclick = function() {
+            document.getElementById('peopleDetails').style.display = "none";
+            document.getElementById('editProfileDetails').style.display = "block";
+            loadProfileFields();
+        }
+
+        document.getElementById('saveProfileBtn').onclick = function() {
+            saveProfile();
+        }
+
+        document.getElementById('updateProfileBtn').onclick = function() {
+            updateProfile();
+        }
+
+        // Load people data from the backend
+        function loadPeopleData() {
+            fetch('/app/get_people')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Fetched people:', data);
+                    peopleData = data;
+                    populatePeopleTree(data);
+                })
+                .catch(error => {
+                    console.error('Error fetching people:', error);
+                });
+        }
+
+        // Populate the people tree
+        function populatePeopleTree(data) {
+            const tree = document.getElementById('peopleTree');
+            tree.innerHTML = '';
+            data.forEach(person => {
+                const li = document.createElement('li');
+                li.textContent = person.name;
+                li.onclick = function() {
+                    selectPerson(person, li);
+                }
+                if (person.has_profile === 'Yes') {
+                    const profileIcon = document.createElement('i');
+                    profileIcon.className = 'fas fa-id-card';
+                    profileIcon.style.marginLeft = '10px';
+                    li.appendChild(profileIcon);
+                }
+                tree.appendChild(li);
+            });
+        }
+
+        // Filter people in the tree
+        function filterPeople() {
+            const searchValue = document.getElementById('searchPeople').value.toLowerCase();
+            const filteredPeople = peopleData.filter(person => person.name.toLowerCase().includes(searchValue));
+            populatePeopleTree(filteredPeople);
+        }
+
+        // Select a person in the tree
+        function selectPerson(person, li) {
+            if (selectedPerson) {
+                selectedPerson.element.classList.remove('selected');
+            }
+            selectedPerson = { person, element: li };
+            li.classList.add('selected');
+            document.getElementById('addProfileBtn').style.display = 'inline-block';
+            document.getElementById('editProfileBtn').disabled = person.has_profile !== 'Yes';
+        }
+
+        // Pre-fill profile fields based on selected person
+        function prefillProfileFields() {
+            if (!selectedPerson) {
+                document.getElementById('firstName').value = '';
+                document.getElementById('lastName').value = '';
+                return;
+            }
+            const nameParts = selectedPerson.person.name.split(' ');
+            document.getElementById('firstName').value = nameParts[0] || '';
+            document.getElementById('lastName').value = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+        }
+
+        // Load profile fields for editing
+        function loadProfileFields() {
+            if (!selectedPerson || selectedPerson.person.has_profile !== 'Yes') return;
+            fetch(`/app/get_profile/${selectedPerson.person.id}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('editFirstName').value = data.first_name;
+                    document.getElementById('editLastName').value = data.last_name;
+                    document.getElementById('editAddress').value = data.address;
+                    document.getElementById('editAddress2').value = data.address2;
+                    document.getElementById('editCity').value = data.city;
+                    document.getElementById('editState').value = data.state;
+                    document.getElementById('editZip').value = data.zip_code;
+                    document.getElementById('editCountry').value = data.country;
+                })
+                .catch(error => {
+                    console.error('Error fetching profile:', error);
+                });
+        }
+
+        // Save profile data
+        function saveProfile() {
+            const profileData = {
+                firstName: document.getElementById('firstName').value,
+                lastName: document.getElementById('lastName').value,
+                address: document.getElementById('address').value,
+                address2: document.getElementById('address2').value,
+                city: document.getElementById('city').value,
+                state: document.getElementById('state').value,
+                zip: document.getElementById('zip').value,
+                country: document.getElementById('country').value,
+                personId: selectedPerson ? selectedPerson.person.id : null
+            };
+
+            fetch('/app/save_profile', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(profileData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Profile saved successfully');
+                    document.getElementById('addProfileDetails').style.display = "none";
+                    document.getElementById('peopleDetails').style.display = "block";
+                    loadPeopleData();
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error saving profile:', error);
+                alert('An error occurred while saving the profile');
+            });
+        }
+
+        // Update profile data
+        function updateProfile() {
+            const profileData = {
+                firstName: document.getElementById('editFirstName').value,
+                lastName: document.getElementById('editLastName').value,
+                address: document.getElementById('editAddress').value,
+                address2: document.getElementById('editAddress2').value,
+                city: document.getElementById('editCity').value,
+                state: document.getElementById('editState').value,
+                zip: document.getElementById('editZip').value,
+                country: document.getElementById('editCountry').value,
+                personId: selectedPerson ? selectedPerson.person.id : null
+            };
+
+            fetch('/app/save_profile', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(profileData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Profile updated successfully');
+                    document.getElementById('editProfileDetails').style.display = "none";
+                    document.getElementById('peopleDetails').style.display = "block";
+                    loadPeopleData();
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error updating profile:', error);
+                alert('An error occurred while updating the profile');
+            });
+        }
+
+        // Initialize the map and load data
+        document.addEventListener('DOMContentLoaded', function() {
+            initMap();
+        });
+    </script>
+</body>
+</html>

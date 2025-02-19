@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training and Prediction</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <style>
+        body, html {
+            font-size: 0.9rem;
+        }
+        .table-responsive {
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        td, th {
+            padding: 0.25rem;
+        }
+        .frame {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+        .frame-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-3">
+        <h1 class="mb-3">Training and Prediction</h1>
+        
+        <div class="frame">
+            <div class="frame-title">Training</div>
+            <button class="btn btn-primary" onclick="processData()">Process</button>
+            <button class="btn btn-secondary" onclick="trainModel()">MLTrain</button>
+            <div id="trainingStatus"></div>
+        </div>
+
+        <div class="frame">
+            <div class="frame-title">Prediction</div>
+            <button class="btn btn-primary" onclick="loadModel()">Load Model</button>
+            <button class="btn btn-secondary" onclick="loadTable()">Load Table</button>
+            <button class="btn btn-success" onclick="predict()">Predict</button>
+            <div id="predictionStatus"></div>
+            <div class="table-responsive">
+                <table class="table table-sm mt-1" id="predictionTable">
+                    <thead class="thead-light">
+                        <tr>
+                            <th scope="col">ID</th>
+                            <th scope="col">Headline</th>
+                            <th scope="col">Body</th>
+                            <th scope="col">Predicted Location</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+            <button class="btn btn-warning mt-2" onclick="integrateMapMarkers()">Integrate Map Markers</button>
+        </div>
+    </div>
+
+    <script>
+        let selectedTable = '';
+        let selectedModel = '';
+
+        function processData() {
+            const table = prompt('Please enter the table name from the news_feed database:');
+            if (table) {
+                selectedTable = table;
+                document.getElementById('trainingStatus').textContent = 'Table is loaded, processing...';
+
+                fetch(`/dev/process_data?table=${table}`, {
+                    method: 'GET'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('trainingStatus').textContent = 'ml_articles are processed and tokenized.';
+                })
+                .catch(error => {
+                    console.error('Error processing data:', error);
+                    document.getElementById('trainingStatus').textContent = 'Error processing data.';
+                });
+            }
+        }
+
+        function trainModel() {
+            if (selectedTable) {
+                document.getElementById('trainingStatus').textContent = 'Training model...';
+
+                fetch('/dev/train_model', {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('trainingStatus').textContent = 'Training model has been created.';
+                })
+                .catch(error => {
+                    console.error('Error training model:', error);
+                    document.getElementById('trainingStatus').textContent = 'Error training model.';
+                });
+            } else {
+                alert('Please process the data first.');
+            }
+        }
+
+        function loadModel() {
+            const model = prompt('Please enter the path to the model file:');
+            if (model) {
+                selectedModel = model;
+                document.getElementById('predictionStatus').textContent = 'Model is loaded.';
+            }
+        }
+
+        function loadTable() {
+            const table = prompt('Please enter the table name from the news_feed database:');
+            if (table) {
+                selectedTable = table;
+
+                fetch(`/dev/load_table?table=${table}`, {
+                    method: 'GET'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.getElementById('predictionTable').querySelector('tbody');
+                    tbody.innerHTML = '';
+                    
+                    data.forEach(article => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${article.id}</td>
+                            <td>${article.headline}</td>
+                            <td>${article.body}</td>
+                            <td></td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+
+                    document.getElementById('predictionStatus').textContent = 'Table is loaded.';
+                })
+                .catch(error => {
+                    console.error('Error loading table:', error);
+                    document.getElementById('predictionStatus').textContent = 'Error loading table.';
+                });
+            }
+        }
+
+        function predict() {
+            if (selectedModel && selectedTable) {
+                document.getElementById('predictionStatus').textContent = 'Predicting...';
+
+                fetch('/dev/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ table: selectedTable, model: selectedModel })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.getElementById('predictionTable').querySelector('tbody');
+                    tbody.innerHTML = '';
+                    
+                    data.forEach(article => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${article.id}</td>
+                            <td>${article.headline}</td>
+                            <td>${article.body}</td>
+                            <td>${article.predicted_location}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+
+                    document.getElementById('predictionStatus').textContent = 'Prediction complete.';
+                })
+                .catch(error => {
+                    console.error('Error predicting:', error);
+                    document.getElementById('predictionStatus').textContent = 'Error predicting.';
+                });
+            } else {
+                alert('Please load the model and table first.');
+            }
+        }
+
+        function integrateMapMarkers() {
+            document.getElementById('predictionStatus').textContent = 'Integrating map markers...';
+
+            fetch('/dev/integrate_map_markers', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('predictionStatus').textContent = 'Map markers integration complete.';
+            })
+            .catch(error => {
+                console.error('Error integrating map markers:', error);
+                document.getElementById('predictionStatus').textContent = 'Error integrating map markers.';
+            });
+        }
+    </script>
+</body>
+</html>

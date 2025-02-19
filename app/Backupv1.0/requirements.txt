@@ -1,0 +1,14 @@
+flask
+flask-cors
+sqlalchemy
+pandas
+scikit-learn
+psycopg2-binary
+geoalchemy2
+shapely
+requests
+beautifulsoup4
+tenacity
+spacy
+transformers
+torch

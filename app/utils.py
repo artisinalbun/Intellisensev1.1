@@ -53,9 +53,10 @@ def geocode_location(location_name, trace):
                 result = data["results"][0]
                 lon = result["geometry"]["location"]["lng"]
                 lat = result["geometry"]["location"]["lat"]
-                trace.add_step(f"Geocoded coordinates for {location_name}", (lon, lat))
-                logging.debug(f"Geocoded coordinates: {lon}, {lat}")
-                return lon, lat
+                if validate_coordinates(lon, lat, location_name):  # Validate coordinates before returning
+                    trace.add_step(f"Geocoded coordinates for {location_name}", (lon, lat))
+                    logging.debug(f"Geocoded coordinates: {lon}, {lat}")
+                    return lon, lat
             else:
                 trace.add_step("No results found in Google Maps API response", data)
                 logging.debug("No results found in Google Maps API response")
@@ -107,11 +108,11 @@ def remove_duplicate_map_markers():
     # Delete duplicate map markers from map_markers table
     db.session.query(MapMarker).filter(
         MapMarker.id.notin_(
-            db.session.query(func.min(MapMarker.id)).group_by(MapMarker.name, MapMarker.location).having(func.count(MapMarker.id) > 1)
+            db.session.query(func.min(MapMarker.id)).group_by(
+                MapMarker.name, MapMarker.article_id
+            ).having(func.count(MapMarker.id) > 1)
         )
     ).delete(synchronize_session=False)
-
-    db.session.commit()
 
 def ensure_corresponding_map_markers():
     articles = Article.query.all()
@@ -132,11 +133,31 @@ def update_map_marker_locations():
     map_markers = MapMarker.query.all()
     for marker in map_markers:
         lon, lat = geocode_location(marker.name, Trace())
-        if lon and lat:
+        if lon and lat and validate_coordinates(lon, lat, marker.name):  # Validate coordinates before updating
             location = format_postgis_geometry(lat, lon)
             marker.location = location
             db.session.add(marker)
     db.session.commit()
+
+def repopulate_map_markers():
+    """Repopulate the map_markers table from the articles table if necessary."""
+    if MapMarker.query.count() == 0:  # Only repopulate if the table is empty
+        articles = Article.query.all()
+        for article in articles:
+            existing_marker = MapMarker.query.filter_by(article_id=article.id).first()
+            if not existing_marker:
+                locations = extract_locations(article.headline, article.body, Trace())
+                if locations:
+                    location_name = locations[0]
+                    lon, lat = geocode_location(location_name, Trace())
+                    if lon and lat:
+                        location = format_postgis_geometry(lat, lon)
+                        new_marker = MapMarker(name=article.headline, location=location, article_id=article.id)
+                        db.session.add(new_marker)
+        db.session.commit()
+        logging.debug("Repopulated map markers from articles")
+    else:
+        logging.debug("Map markers table is not empty; skipping repopulation")
         
 class Trace:
     def __init__(self):

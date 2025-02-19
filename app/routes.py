@@ -453,7 +453,7 @@ def get_articles():
 def remove_duplicates_route():
     remove_duplicate_articles()
     remove_duplicate_map_markers()
-    ensure_corresponding_map_markers()
+    ensure_corresponding_map_markers()  # Ensure this is called after removing duplicates
     return jsonify({"status": "success", "message": "Duplicates removed and map markers refreshed"})
 
 

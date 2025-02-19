@@ -2,8 +2,8 @@ from flask import Flask
 from flask_cors import CORS
 from app.database import init_db, db
 from app.devflask import dev_app  # Import the developer tool blueprint
-from app.utils import update_map_marker_locations
-from app.models import MapMarker
+from app.utils import update_map_marker_locations, repopulate_map_markers  # Import the repopulate function
+from app.models import MapMarker, Article  # Import Article model
 import logging
 from sqlalchemy import func
 
@@ -29,11 +29,18 @@ def create_app():
         # Remove duplicate map markers
         db.session.query(MapMarker).filter(
             MapMarker.id.notin_(
-                db.session.query(func.min(MapMarker.id)).group_by(MapMarker.name, MapMarker.location).having(func.count(MapMarker.id) > 1)
+                db.session.query(func.min(MapMarker.id)).group_by(MapMarker.name, MapMarker.article_id).having(func.count(MapMarker.id) > 1)
             )
         ).delete(synchronize_session=False)
         db.session.commit()
         logging.debug("Removed duplicate map markers")
+
+        # Repopulate map markers from articles (only if necessary)
+        if MapMarker.query.count() == 0 or Article.query.count() > MapMarker.query.count():
+            repopulate_map_markers()  # Call the repopulate function
+            logging.debug("Repopulated map markers from articles (if necessary)")
+        else:
+            logging.debug("Map markers table is not empty; skipping repopulation")
 
         # Update map marker locations
         update_map_marker_locations()

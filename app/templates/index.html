@@ -117,51 +117,97 @@
         }
 
         /* Radial Menu Styles */
-.radial-menu {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 250px;
-    height: 250px;
-    z-index: 1000;
-    cursor: grab; /* Indicate draggable area */
-}
+        .radial-menu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 250px;
+            height: 250px;
+            z-index: 1000;
+            cursor: grab; /* Indicate draggable area */
+        }
 
-.radial-menu.hidden {
-    display: none;
-}
+        .radial-menu.hidden {
+            display: none;
+        }
 
-.radial-menu svg {
-    width: 100%;
-    height: 100%;
-    cursor: pointer;
-}
+        .radial-menu svg {
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
 
-.radial-menu .radial-button {
-    transition: fill 0.3s ease;
-}
+        .radial-menu .radial-button {
+            transition: fill 0.3s ease;
+        }
 
-.radial-menu .radial-button:hover {
-    fill: rgba(0, 123, 255, 0.5); /* Highlight color on hover */
-}
+        .radial-menu .radial-button:hover {
+            fill: rgba(0, 123, 255, 0.5); /* Highlight color on hover */
+        }
 
-.ticker {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 80%;
-    text-align: center;
-    font-size: 14px;
-    color: white;
-    z-index: 1001;
-    pointer-events: none; /* Ensure the ticker doesn't block clicks */
-}
+        .ticker {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            text-align: center;
+            font-size: 14px;
+            color: white;
+            z-index: 1001;
+            pointer-events: none; /* Ensure the ticker doesn't block clicks */
+        }
 
-.draggable {
-    cursor: grab; /* Indicate draggable area */
-}
+        .draggable {
+            cursor: grab; /* Indicate draggable area */
+        }
+
+        /* Explorer Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1050;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background-color: #fff;
+            margin: 10% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 50%;
+            max-width: 600px;
+            border-radius: 5px;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        #scraperList {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+
+        #scraperList label {
+            display: block;
+            margin: 5px 0;
+        }
     </style>
 </head>
 <body>
@@ -371,36 +417,49 @@
         </div>
     </div>
 
-<!-- Radial Menu -->
-<div id="pipelineRadialMenu" class="radial-menu hidden">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
-        <!-- Semi-transparent outer ring -->
-        <circle cx="200" cy="200" r="180" fill="rgba(0,0,0,0.5)" />
+    <!-- Radial Menu -->
+    <div id="pipelineRadialMenu" class="radial-menu hidden">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+            <!-- Semi-transparent outer ring -->
+            <circle cx="200" cy="200" r="180" fill="rgba(0,0,0,0.5)" />
 
-        <!-- Button sections (with lower opacity) -->
-        <!-- Top button - Select -->
-        <path class="radial-button" id="selectScrapersBtn" d="M200,20 A180,180 0 0,1 380,200 L200,200 Z" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.25)" stroke-width="1" />
-        <text x="290" y="110" fill="white" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Select</text>
+            <!-- Button sections (with lower opacity) -->
+            <!-- Top button - Select -->
+            <path class="radial-button" id="selectScrapersBtn" d="M200,20 A180,180 0 0,1 380,200 L200,200 Z" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.25)" stroke-width="1" />
+            <text x="290" y="110" fill="white" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Select</text>
 
-        <!-- Right button - Load -->
-        <path class="radial-button" id="loadScrapersBtn" d="M380,200 A180,180 0 0,1 200,380 L200,200 Z" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.25)" stroke-width="1" />
-        <text x="290" y="290" fill="white" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Load</text>
+            <!-- Right button - Load -->
+            <path class="radial-button" id="loadScrapersBtn" d="M380,200 A180,180 0 0,1 200,380 L200,200 Z" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.25)" stroke-width="1" />
+            <text x="290" y="290" fill="white" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Load</text>
 
-        <!-- Bottom button - Activate ML -->
-        <path class="radial-button" id="activateMLBtn" d="M200,380 A180,180 0 0,1 20,200 L200,200 Z" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.25)" stroke-width="1" />
-        <text x="110" y="290" fill="white" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Activate ML</text>
+            <!-- Bottom button - Activate ML -->
+            <path class="radial-button" id="activateMLBtn" d="M200,380 A180,180 0 0,1 20,200 L200,200 Z" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.25)" stroke-width="1" />
+            <text x="110" y="290" fill="white" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Activate ML</text>
 
-        <!-- Left button - Run Pipeline -->
-        <path class="radial-button" id="runPipelineBtn" d="M20,200 A180,180 0 0,1 200,20 L200,200 Z" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.25)" stroke-width="1" />
-        <text x="110" y="110" fill="white" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Run Pipeline</text>
+            <!-- Left button - Run Pipeline -->
+            <path class="radial-button" id="runPipelineBtn" d="M20,200 A180,180 0 0,1 200,20 L200,200 Z" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.25)" stroke-width="1" />
+            <text x="110" y="110" fill="white" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Run Pipeline</text>
 
-        <!-- Clean inner circle (placed AFTER the button sections to cover intersection lines) -->
-        <circle class="draggable" cx="200" cy="200" r="80" fill="rgba(0,0,0,0.6)" />
-        <!-- Additional thin border ring around inner circle -->
-        <circle cx="200" cy="200" r="80" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1" />
-    </svg>
-    <div class="ticker" id="pipelineTicker">Pipeline Messages</div>
-</div>
+            <!-- Clean inner circle (placed AFTER the button sections to cover intersection lines) -->
+            <circle class="draggable" cx="200" cy="200" r="80" fill="rgba(0,0,0,0.6)" />
+            <!-- Additional thin border ring around inner circle -->
+            <circle cx="200" cy="200" r="80" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1" />
+        </svg>
+        <div class="ticker" id="pipelineTicker">Pipeline Messages</div>
+    </div>
+
+    <!-- Explorer Modal -->
+    <div id="explorerModal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="closeExplorerModal">&times;</span>
+            <h2>Select Scrapers</h2>
+            <div id="scraperList">
+                <!-- Scrapers will be dynamically populated here -->
+            </div>
+            <button id="confirmScrapersBtn">Done</button>
+        </div>
+    </div>
+
     <!-- Delete Profile Modal -->
     <div id="deleteProfileModal" class="modal">
         <div class="modal-content">
@@ -990,78 +1049,6 @@
             const radialMenu = document.getElementById('pipelineRadialMenu');
             radialMenu.classList.toggle('hidden');
         };
-        // Add event listeners to SVG paths
-        document.getElementById('selectScrapersBtn').onclick = function() {
-            updateTicker('Selecting scrapers...');
-        };
-
-        document.getElementById('loadScrapersBtn').onclick = function() {
-            fetch('/app/load_scraper', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ scraper_name: 'news_scraper' })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    updateTicker('All Scrapers Loaded');
-                } else {
-                    updateTicker(`Error: ${data.message}`);
-                }
-            })
-            .catch(error => {
-                console.error('Error loading scrapers:', error);
-                updateTicker('Error loading scrapers');
-            });
-        };
-
-        document.getElementById('activateMLBtn').onclick = function() {
-            const isActive = document.getElementById('activateMLBtn').classList.toggle('active');
-            fetch('/app/toggle_ml_model', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ ml_model_active: isActive })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    updateTicker('ML Channel Activated');
-                } else {
-                    updateTicker(`Error: ${data.message}`);
-                }
-            })
-            .catch(error => {
-                console.error('Error toggling ML model:', error);
-                updateTicker('Error toggling ML model');
-            });
-        };
-
-        document.getElementById('runPipelineBtn').onclick = function() {
-            fetch('/app/data_refresh', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    updateTicker('Pipeline Running...');
-                    fetchMarkers();  // Reload markers on the map
-                    loadNewsData();  // Reload articles in the sidebar
-                } else {
-                    updateTicker(`Error: ${data.message}`);
-                }
-            })
-            .catch(error => {
-                console.error('Error running pipeline:', error);
-                updateTicker('Error running pipeline');
-            });
-        };
 
         // Ticker Functionality
         let tickerMessages = [];
@@ -1084,18 +1071,65 @@
 
         // Select Scrapers
         document.getElementById('selectScrapersBtn').onclick = function() {
-            // Open file explorer (to be implemented)
-            updateTicker('Selecting scrapers...');
+            const explorerModal = document.getElementById('explorerModal');
+            explorerModal.style.display = 'block';
+
+            // Fetch scraper files from the backend
+            fetch('/app/get_scrapers')
+                .then(response => response.json())
+                .then(data => {
+                    const scraperList = document.getElementById('scraperList');
+                    scraperList.innerHTML = ''; // Clear existing list
+
+                    data.scrapers.forEach(scraper => {
+                        const label = document.createElement('label');
+                        label.innerHTML = `
+                            <input type="checkbox" name="scraper" value="${scraper}">
+                            ${scraper}
+                        `;
+                        scraperList.appendChild(label);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching scrapers:', error);
+                });
         };
 
-        // Load Scrapers
+        // Close the explorer modal
+        document.getElementById('closeExplorerModal').onclick = function() {
+            document.getElementById('explorerModal').style.display = 'none';
+        };
+
+        // Confirm selected scrapers
+        document.getElementById('confirmScrapersBtn').onclick = function() {
+            const selectedScrapers = [];
+            document.querySelectorAll('#scraperList input[type="checkbox"]:checked').forEach(checkbox => {
+                selectedScrapers.push(checkbox.value);
+            });
+
+            // Store selected scrapers for later use
+            window.selectedScrapers = selectedScrapers;
+
+            // Close the modal
+            document.getElementById('explorerModal').style.display = 'none';
+
+            // Update the ticker
+            updateTicker(`${selectedScrapers.length} scrapers selected`);
+        };
+
+        // Load selected scrapers
         document.getElementById('loadScrapersBtn').onclick = function() {
-            fetch('/app/load_scraper', {
+            if (!window.selectedScrapers || window.selectedScrapers.length === 0) {
+                updateTicker('No scrapers selected');
+                return;
+            }
+
+            fetch('/app/load_scrapers', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ scraper_name: 'news_scraper' })
+                body: JSON.stringify({ scrapers: window.selectedScrapers })
             })
             .then(response => response.json())
             .then(data => {
@@ -1111,37 +1145,19 @@
             });
         };
 
-        // Activate ML Channel
-        document.getElementById('activateMLBtn').onclick = function() {
-            const isActive = document.getElementById('activateMLBtn').classList.toggle('active');
-            fetch('/app/toggle_ml_model', {
+        // Run selected scrapers
+        document.getElementById('runPipelineBtn').onclick = function() {
+            if (!window.selectedScrapers || window.selectedScrapers.length === 0) {
+                updateTicker('No scrapers selected');
+                return;
+            }
+
+            fetch('/app/run_pipeline', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ ml_model_active: isActive })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    updateTicker('ML Channel Activated');
-                } else {
-                    updateTicker(`Error: ${data.message}`);
-                }
-            })
-            .catch(error => {
-                console.error('Error toggling ML model:', error);
-                updateTicker('Error toggling ML model');
-            });
-        };
-
-        // Run Pipeline
-        document.getElementById('runPipelineBtn').onclick = function() {
-            fetch('/app/data_refresh', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+                body: JSON.stringify({ scrapers: window.selectedScrapers })
             })
             .then(response => response.json())
             .then(data => {
@@ -1159,9 +1175,23 @@
             });
         };
 
-        // Initialize the map and load data
-        document.addEventListener('DOMContentLoaded', function() {
-            initMap();
+        // Remove duplicates when the application starts
+        fetch('/app/remove_duplicates', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                console.log('Duplicates removed successfully');
+            } else {
+                console.error('Error removing duplicates:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error removing duplicates:', error);
         });
 
         // Drag functionality for the radial menu
@@ -1198,6 +1228,11 @@
             if (isDragging) {
                 e.preventDefault();
             }
+        });
+
+        // Initialize the map and load data
+        document.addEventListener('DOMContentLoaded', function() {
+            initMap();
         });
     </script>
 </body>

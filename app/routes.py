@@ -13,6 +13,7 @@ import re
 from collections import defaultdict
 from sqlalchemy import inspect
 from sqlalchemy.exc import IntegrityError
+from .utils import remove_duplicate_articles, remove_duplicate_map_markers, ensure_corresponding_map_markers
 
 app = Blueprint('app', __name__)
 
@@ -447,6 +448,15 @@ def get_articles():
         for article in articles
     ]
     return jsonify(article_list)
+
+@app.route('/remove_duplicates', methods=['POST'])
+def remove_duplicates_route():
+    remove_duplicate_articles()
+    remove_duplicate_map_markers()
+    ensure_corresponding_map_markers()
+    return jsonify({"status": "success", "message": "Duplicates removed and map markers refreshed"})
+
+
 
 # Ensure the 'profiles_ppl' table exists
 def ensure_profiles_table():

@@ -24,15 +24,18 @@ class ScraperManager:
         all_articles = []
         for scraper in self.scrapers:
             articles = scraper.scrape(scraper.base_url)  # Call the scrape method of each scraper
-            all_articles.extend(articles)
-            logging.info(f"Scraped {len(articles)} articles using {scraper.__class__.__name__}")
+            if articles:  # Check if articles were returned
+                all_articles.extend(articles)
+                logging.info(f"Scraped {len(articles)} articles using {scraper.__class__.__name__}")
+            else:
+                logging.warning(f"No articles scraped by {scraper.__class__.__name__}")
 
         # Optionally, process the scraped articles further (e.g., save to the database)
-        for article in all_articles:
-            # Save the article to the database or update existing entries
-            pass
-
-        logging.info(f"Total articles scraped: {len(all_articles)}")
+        if all_articles:
+            self.update_database(all_articles)  # Update the database with scraped articles
+            logging.info(f"Total articles scraped: {len(all_articles)}")
+        else:
+            logging.warning("No articles scraped by any scraper.")
 
     def run_ml_model_on_articles(self, articles):
         from app.ml_models import run_model_on_articles

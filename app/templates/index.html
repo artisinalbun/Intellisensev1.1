@@ -843,41 +843,54 @@
             tree.style.display = 'none'; // Hide the tree initially
         }
 
-        // Function to open article details in a new window
-        function openArticleDetails(article) {
-            console.log('Article data:', article); // Debugging: Inspect the article object
+            // Function to open article details in a new window
+    function openArticleDetails(article) {
+        console.log('Article data:', article);  // Debugging: Inspect the article object
 
-            if (!article || !article.headline || !article.body) {
+        // Validate the article data
+        if (!article || !article.headline || !article.body) {
             console.error('Invalid article data:', article);
             alert('Unable to open article details. Invalid data.');
             return;
         }
 
+        // Create a new window and write the minimal article details
         const newWindow = window.open('', '_blank', 'width=600,height=400');
         newWindow.document.write(`
             <html>
                 <head>
                     <title>${article.headline}</title>
                     <style>
-                        body { font-family: Arial, sans-serif; padding: 20px; }
-                        h1 { font-size: 20px; font-weight: bold; }
-                        p { margin: 10px 0; }
+                        body { 
+                            font-family: Arial, sans-serif; 
+                            padding: 20px; 
+                            line-height: 1.6; 
+                        }
+                        h1 { 
+                            font-size: 20px; 
+                            font-weight: bold; 
+                            margin-bottom: 10px; 
+                        }
+                        .source { 
+                            font-size: 14px; 
+                            color: #555; 
+                            margin-bottom: 20px; 
+                        }
+                        .body { 
+                            font-size: 16px; 
+                            white-space: pre-wrap;  /* Preserve line breaks in the body */
+                        }
                     </style>
                 </head>
                 <body>
                     <h1>${article.headline}</h1>
-                    <p><strong>Source:</strong> ${article.source || 'N/A'}</p>
-                    <p><strong>Date:</strong> ${article.date || 'N/A'}</p>
-                    <p><strong>People Mentioned:</strong> ${article.people ? article.people.join(', ') : 'N/A'} (${article.num_people || 0})</p>
-                    <p><strong>Locations Mentioned:</strong> ${article.locations ? article.locations.join(', ') : 'N/A'} (${article.num_locations || 0})</p>
-                    <p><strong>Organizations Mentioned:</strong> ${article.organizations ? article.organizations.join(', ') : 'N/A'} (${article.num_organizations || 0})</p>
-                    <p><strong>Body:</strong></p>
-                    <p>${article.body}</p>
-                    <p><strong>URL:</strong> <a href="${article.url}" target="_blank">${article.url}</a></p>
+                    <div class="source">Source: ${article.source || 'N/A'}</div>
+                    <div class="body">${article.body}</div>
                 </body>
             </html>
         `);
         newWindow.document.close();
+
 }
 
         // Function to select an article in the tree
@@ -1081,6 +1094,7 @@
                     const scraperList = document.getElementById('scraperList');
                     scraperList.innerHTML = ''; // Clear existing list
 
+                    // Populate the list with checkboxes for each scraper
                     data.scrapers.forEach(scraper => {
                         const label = document.createElement('label');
                         label.innerHTML = `
@@ -1092,12 +1106,8 @@
                 })
                 .catch(error => {
                     console.error('Error fetching scrapers:', error);
+                    updateTicker('Error fetching scrapers');
                 });
-        };
-
-        // Close the explorer modal
-        document.getElementById('closeExplorerModal').onclick = function() {
-            document.getElementById('explorerModal').style.display = 'none';
         };
 
         // Confirm selected scrapers
@@ -1234,6 +1244,59 @@
         document.addEventListener('DOMContentLoaded', function() {
             initMap();
         });
+
+        let mlModelActive = false; // Track ML model activation state
+        let mlTickerInterval = null; // Interval for showing ML activation feedback
+
+        // Activate ML
+        document.getElementById('activateMLBtn').onclick = function() {
+            const mlActive = !mlModelActive; // Toggle the state
+            fetch('/app/toggle_ml_model', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ ml_model_active: mlActive })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    mlModelActive = data.ml_model_active; // Update the frontend state
+                    updateTicker(`ML model ${mlModelActive ? 'activated' : 'deactivated'}`);
+
+                    // Start or stop the intermittent feedback
+                    if (mlModelActive) {
+                        startMLTicker();
+                    } else {
+                        stopMLTicker();
+                    }
+                } else {
+                    updateTicker('Error toggling ML model');
+                }
+            })
+            .catch(error => {
+                console.error('Error toggling ML model:', error);
+                updateTicker('Error toggling ML model');
+            });
+        };
+
+        // Function to start showing intermittent feedback
+        function startMLTicker() {
+            if (mlTickerInterval) clearInterval(mlTickerInterval); // Clear any existing interval
+
+            mlTickerInterval = setInterval(() => {
+                updateTicker("Machine Learning Channel is active");
+                setTimeout(() => updateTicker(""), 2000); // Clear the message after 2 seconds
+            }, 5000); // Show the message every 5 seconds
+        }
+
+        // Function to stop showing intermittent feedback
+        function stopMLTicker() {
+            if (mlTickerInterval) {
+                clearInterval(mlTickerInterval);
+                mlTickerInterval = null;
+            }
+        }
     </script>
 </body>
 </html>

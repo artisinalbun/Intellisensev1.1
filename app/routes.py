@@ -10,12 +10,17 @@ import logging
 import joblib
 import pandas as pd
 import re
+from pathlib import Path
 from collections import defaultdict
 from sqlalchemy import inspect
 from sqlalchemy.exc import IntegrityError
 from .utils import remove_duplicate_articles, remove_duplicate_map_markers, ensure_corresponding_map_markers
+import importlib
 
 app = Blueprint('app', __name__)
+
+# Define the path to the scrapers directory
+SCRAPERS_DIR = Path(__file__).parent.parent / "scrapers"
 
 data_manager = DataManager()
 scraper_manager = ScraperManager()
@@ -192,6 +197,18 @@ def predict_location():
 
     return jsonify({'predicted_location': prediction[0]})
 
+@app.route('/get_scrapers', methods=['GET'])
+def get_scrapers():
+    """Return a list of valid scraper files in the scrapers directory."""
+    try:
+        # Find all files in the scrapers directory that match the pattern *_scraper.py
+        scraper_files = [f.stem for f in SCRAPERS_DIR.glob("*_scraper.py")]
+        logging.debug(f"Found scraper files: {scraper_files}")
+        return jsonify({"scrapers": scraper_files})
+    except Exception as e:
+        logging.error(f"Error fetching scraper files: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 # Scrape articles
 @app.route('/scrape', methods=['GET'])
 def scrape():
@@ -201,17 +218,24 @@ def scrape():
     return "Scraping complete"
 
 # Load AP News Scraper
-@app.route('/load_scraper', methods=['POST'])
-def load_scraper():
-    try:
-        # Load the AP News scraper
-        scraper_manager.load_scrapers()
-        logging.info("AP News scraper loaded successfully")
-        return jsonify({"status": "success", "message": "AP News scraper loaded successfully"})
-    except Exception as e:
-        logging.error(f"Error loading scraper: {str(e)}", exc_info=True)
-        return jsonify({"status": "error", "message": f"An error occurred: {str(e)}"}), 500
+@app.route('/load_scrapers', methods=['POST'])
+def load_scrapers():
+    """Load the selected scrapers."""
+    data = request.get_json()
+    scrapers = data.get('scrapers', [])
+    logging.debug(f"Loading scrapers: {scrapers}")
 
+    try:
+        # Logic to load scrapers (e.g., import modules)
+        for scraper in scrapers:
+            module_name = f"scrapers.{scraper}"
+            importlib.import_module(module_name)
+            logging.debug(f"Loaded scraper: {scraper}")
+
+        return jsonify({"status": "success", "message": "Scrapers loaded successfully"})
+    except Exception as e:
+        logging.error(f"Error loading scrapers: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": str(e)}), 500
 # Toggle ML Model
 @app.route('/toggle_ml_model', methods=['POST'])
 def toggle_ml_model():
@@ -223,18 +247,36 @@ def toggle_ml_model():
         scraper_manager.ml_model_active = ml_model_active
         logging.info(f"ML model toggled: {ml_model_active}")
 
-        return jsonify({"status": "success", "message": f"ML model toggled to {ml_model_active}"})
+        # Return the updated state
+        return jsonify({
+            "status": "success",
+            "message": f"ML model toggled to {ml_model_active}",
+            "ml_model_active": ml_model_active
+        })
     except Exception as e:
         logging.error(f"Error toggling ML model: {str(e)}", exc_info=True)
         return jsonify({"status": "error", "message": f"An error occurred: {str(e)}"}), 500
 
 # Data Refresh
-@app.route('/data_refresh', methods=['POST'])
-def data_refresh():
+@app.route('/run_pipeline', methods=['POST'])
+def run_pipeline():
+    """Run the selected scrapers and optionally apply the ML model."""
+    data = request.get_json()
+    scrapers = data.get('scrapers', [])
+    logging.debug(f"Running scrapers: {scrapers}")
+
     try:
-        # Step 1: Trigger the news scraper to scrape new articles
+        # Step 1: Run the selected scrapers
         logging.info("Starting to scrape new articles...")
-        scraper_manager.run_scrapers()  # Run all loaded scrapers
+        for scraper in scrapers:
+            module_name = f"scrapers.{scraper}"
+            module = importlib.import_module(module_name)
+            scraper_instance = getattr(module, scraper.title().replace("_", ""))()
+            if hasattr(scraper_instance, 'scrape'):  # Check for the 'scrape' method
+                scraper_instance.scrape(scraper_instance.base_url)  # Call the 'scrape' method
+                logging.debug(f"Ran scraper: {scraper}")
+            else:
+                logging.warning(f"Scraper {scraper} does not have a 'scrape' function")
         logging.info("Scraping completed.")
 
         # Step 2: Process the newly scraped articles using the ML model (if activated)
@@ -242,8 +284,8 @@ def data_refresh():
             logging.info("Processing articles with the ML model...")
             articles = Article.query.all()  # Fetch all articles from the database
             for article in articles:
-                # Example: Use the ML model to predict something (e.g., location)
-                prediction = ml_models.predict_location(article.headline, article.body)
+                # Use the ML model to predict something (e.g., location)
+                prediction = ml_models.predict_location(article)
                 logging.debug(f"Predicted location for article {article.id}: {prediction}")
                 # Update the article with the prediction (if needed)
                 # article.predicted_location = prediction
@@ -256,10 +298,10 @@ def data_refresh():
         articles = Article.query.all()
         logging.info(f"Reloaded {len(articles)} articles from the database.")
 
-        return jsonify({"status": "success", "message": "Data refreshed successfully"})
+        return jsonify({"status": "success", "message": "Pipeline executed successfully"})
     except Exception as e:
-        logging.error(f"Error refreshing data: {str(e)}", exc_info=True)
-        return jsonify({"status": "error", "message": f"An error occurred: {str(e)}"}), 500
+        logging.error(f"Error running pipeline: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # Ensure the 'people' table exists and populate it
 def ensure_people_table():

@@ -55,8 +55,8 @@ class MLModels:
             return None
 
         # Tokenize headline and body
-        tokenized_headline = self.data_manager.tokenize_text(article['headline'])
-        tokenized_body = self.data_manager.tokenize_text(article['body'])
+        tokenized_headline = self.data_manager.tokenize_text(article.headline)
+        tokenized_body = self.data_manager.tokenize_text(article.body)
 
         # Flatten the tokenized columns
         X_headline = pd.DataFrame([tokenized_headline]).fillna(0).astype(int)

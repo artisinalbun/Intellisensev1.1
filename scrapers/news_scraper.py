@@ -87,6 +87,8 @@ class NewsScraper(BaseScraper):  # Ensure the class name is correct
 
     def scrape(self, category_url):
         article_links = self.extract_article_links(category_url)
+        scraped_articles = []  # List to store scraped articles
+
         for url in article_links:
             if Article.query.filter_by(url=url).first():
                 logging.info(f"Skipping already scraped article: {url}")
@@ -153,9 +155,24 @@ class NewsScraper(BaseScraper):  # Ensure the class name is correct
                     db.session.add(marker)
                     db.session.commit()
 
+                # Add the scraped article to the list
+                scraped_articles.append({
+                    "id": article.id,
+                    "headline": headline,
+                    "body": body,
+                    "url": url,
+                    "date": article.date,
+                    "source": article.source,
+                    "people": article.people,
+                    "locations": article.locations,
+                    "organizations": article.organizations
+                })
+
                 time.sleep(random.uniform(1, 3))
             except Exception as e:
                 logging.error(f"Error scraping article {url}: {str(e)}", exc_info=True)
+
+        return scraped_articles  # Return the list of scraped articles
 
     def extract_date(self, soup):
         date_tag = soup.find("meta", {"property": "article:published_time"})

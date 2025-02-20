@@ -1,6 +1,7 @@
 import pandas as pd
 from app.models import DataEntry, Article
 from app.database import db
+from transformers import BertTokenizer
 import logging
 
 class DataManager:
@@ -8,6 +9,7 @@ class DataManager:
         self.df = pd.DataFrame(columns=[
             'headline', 'body', 'correct_location'
         ])
+        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')  # Initialize tokenizer
         logging.debug("DataManager initialized with empty DataFrame")
     
     def load_data_from_db(self):
@@ -51,12 +53,15 @@ class DataManager:
 
     def tokenize_data(self):
         logging.debug("Tokenizing data")
-        # Using a tokenizer from Hugging Face's transformers library
-        from transformers import BertTokenizer
-        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        self.df['tokenized_headline'] = self.df['headline'].apply(lambda x: tokenizer.encode(x, add_special_tokens=True))
-        self.df['tokenized_body'] = self.df['body'].apply(lambda x: tokenizer.encode(x, add_special_tokens=True))
+        # Use the tokenizer instance initialized in __init__
+        self.df['tokenized_headline'] = self.df['headline'].apply(lambda x: self.tokenizer.encode(x, add_special_tokens=True))
+        self.df['tokenized_body'] = self.df['body'].apply(lambda x: self.tokenizer.encode(x, add_special_tokens=True))
         logging.debug(f"Tokenized DataFrame: {self.df}")
+
+    def tokenize_text(self, text):
+        """Tokenize a single piece of text using the BERT tokenizer."""
+        return self.tokenizer.encode(text, add_special_tokens=True)
+
 
     def get_dataframe(self):
         logging.debug(f"Returning DataFrame: {self.df}")

@@ -820,6 +820,7 @@
             const tree = document.getElementById('newsTree');
             tree.innerHTML = '';
             data.forEach(article => {
+                console.log('Populating article:', article); // Debugging: Log each article
                 const li = document.createElement('li');
                 li.textContent = `${article.headline} (${article.date})`;
 
@@ -919,9 +920,11 @@
         // Filter news in the tree
         function filterNews() {
             const searchValue = document.getElementById('searchNews').value.toLowerCase();
+            console.log('Searching for:', searchValue); // Debugging: Log search value
             fetch(`/app/search_articles?query=${searchValue}`)
                 .then(response => response.json())
                 .then(data => {
+                    console.log('Search results:', data); // Debugging: Log search results
                     populateNewsTree(data);
                 })
                 .catch(error => {

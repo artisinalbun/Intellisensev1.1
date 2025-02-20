@@ -841,7 +841,7 @@
                 };
                 tree.appendChild(li);
             });
-            tree.style.display = 'none'; // Hide the tree initially
+            tree.style.display = 'block'; // Ensure the tree is displayed after populating it
         }
 
             // Function to open article details in a new window
@@ -924,13 +924,24 @@
             fetch(`/app/search_articles?query=${searchValue}`)
                 .then(response => response.json())
                 .then(data => {
-                    console.log('Search results:', data); // Debugging: Log search results
-                    populateNewsTree(data);
+                    console.log('Raw search results:', data); // Debugging: Log raw search results
+                    if (Array.isArray(data)) {
+                        console.log('Search results:', data); // Debugging: Log search results
+                        data.forEach(article => {
+                            if (!article.body) {
+                                console.error('Article missing body:', article);
+                            }
+                        });
+                        populateNewsTree(data);
+                    } else {
+                        console.error('Invalid search results format:', data);
+                        alert('Error: Invalid search results format.');
+                    }
                 })
                 .catch(error => {
                     console.error('Error searching articles:', error);
                 });
-        }
+    }
 
         // Toggle Advanced Search modal
         document.getElementById('advancedSearchBtn').onclick = function() {

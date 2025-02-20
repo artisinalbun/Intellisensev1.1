@@ -465,7 +465,25 @@ def search_articles():
     else:
         return jsonify({'status': 'error', 'message': 'Invalid search_by parameter'}), 400
 
-    article_list = [{'id': article.id, 'headline': article.headline, 'source': article.source, 'date': article.date, 'locations': article.locations, 'people': article.people, 'organizations': article.organizations} for article in articles]
+    article_list = [
+        
+        {
+            'id': article.id,
+            'headline': article.headline,
+            'body': article.body,
+            'source': article.source,
+            'date': article.date,
+            'locations': article.locations,
+            'people': article.people,
+            'organizations': article.organizations
+         } 
+         for article in articles
+    ]
+
+    # Debugging: Log the articles being returned
+    for article in article_list:
+        print(f"Article ID: {article['id']}, Headline: {article['headline']}, Body: {article['body']}")    
+    
     return jsonify(article_list)
 
 # Get all articles

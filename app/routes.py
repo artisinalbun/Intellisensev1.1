@@ -517,6 +517,24 @@ def remove_duplicates_route():
     return jsonify({"status": "success", "message": "Duplicates removed and map markers refreshed"})
 
 
+@app.route('/add_tags', methods=['POST'])
+def add_tags():
+    data = request.json
+    article_id = data.get('article_id')
+    new_tags = data.get('tags')
+
+    article = Article.query.get(article_id)
+    if not article:
+        return jsonify({'status': 'error', 'message': 'Article not found'}), 404
+
+    if article.tags:
+        article.tags += f", {new_tags}"
+    else:
+        article.tags = new_tags
+
+    db.session.commit()
+    return jsonify({'status': 'success', 'message': 'Tags added successfully'})
+
 
 # Ensure the 'profiles_ppl' table exists
 def ensure_profiles_table():

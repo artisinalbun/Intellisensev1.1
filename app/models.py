@@ -27,7 +27,8 @@ class Article(db.Model):
     organizations = db.Column(db.Text)
     num_organizations = db.Column(db.Integer)
     profiles = db.Column(db.Integer)
-
+    tags = db.Column(db.Text)
+    
     def as_dict(self):
         return {
             "id": self.id,

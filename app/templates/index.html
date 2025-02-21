@@ -208,6 +208,36 @@
             display: block;
             margin: 5px 0;
         }
+
+        /* New styles for the article window */
+        .article-window {
+            background-color: #f5f5dc; /* Light tan color */
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        .article-window h1 {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .article-window .source {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 20px;
+        }
+        .article-window .body {
+            font-size: 16px;
+            white-space: pre-wrap;  /* Preserve line breaks in the body */
+        }
+        .highlight-blue {
+            background-color: lightblue;
+        }
+        .highlight-green {
+            background-color: palegreen;
+        }
+        .highlight-pink {
+            background-color: palepink;
+        }
     </style>
 </head>
 <body>
@@ -405,6 +435,7 @@
                                     <th class="location-column hidden">Location</th>
                                     <th class="people-column hidden">People</th>
                                     <th class="organizations-column hidden">Organizations</th>
+                                    <th>Actions</th> <!-- Add this column for the 'open' icon buttons -->-->
                                 </tr>
                             </thead>
                             <tbody>
@@ -855,6 +886,12 @@
             return;
         }
 
+        // Ensure people, locations, and organizations are strings
+        const people = typeof article.people === 'string' ? article.people : '';
+        const locations = typeof article.locations === 'string' ? article.locations : '';
+        const organizations = typeof article.organizations === 'string' ? article.organizations : '';
+
+
         // Create a new window and write the minimal article details
         const newWindow = window.open('', '_blank', 'width=600,height=400');
         newWindow.document.write(`
@@ -865,7 +902,8 @@
                         body { 
                             font-family: Arial, sans-serif; 
                             padding: 20px; 
-                            line-height: 1.6; 
+                            line-height: 1.6;
+                            background-color: #f5f5dc;
                         }
                         h1 { 
                             font-size: 20px; 
@@ -881,18 +919,91 @@
                             font-size: 16px; 
                             white-space: pre-wrap;  /* Preserve line breaks in the body */
                         }
+                        .highlight-blue {
+                        background-color: lightblue;
+                        }
+                        .highlight-green {
+                            background-color: palegreen;
+                        }
+                        .highlight-pink {
+                            background-color: palepink;
+                        }
                     </style>
                 </head>
                 <body>
                     <h1>${article.headline}</h1>
                     <div class="source">Source: ${article.source || 'N/A'}</div>
-                    <div class="body">${article.body}</div>
+                    <div class="body">${highlightText(article.body, article.people, article.locations, article.organizations)}</div>
+                    <div class="tags">
+                        <h3>Tags</h3>
+                        <div>${article.tags || 'No tags'}</div>
+                        <input type="text" id="newTag" placeholder="Add a tag">
+                        <button onclick="addTag(${article.id})">+</button>
+                    </div>
                 </body>
             </html>
         `);
         newWindow.document.close();
 
-}
+    }
+
+    // Function to highlight text
+    function highlightText(body, people, locations, organizations) {
+            let highlightedBody = body;
+
+            if (typeof people === 'string' && people.trim() !== '') {
+                people.split(',').forEach(person => {
+                    const regex = new RegExp(`\\b${person.trim()}\\b`, 'gi');
+                    highlightedBody = highlightedBody.replace(regex, `<span class="highlight-blue">${person.trim()}</span>`);
+                });
+            }
+
+            if (typeof locations === 'string' && locations.trim() !== '') {
+                locations.split(',').forEach(location => {
+                    const regex = new RegExp(`\\b${location.trim()}\\b`, 'gi');
+                    highlightedBody = highlightedBody.replace(regex, `<span class="highlight-green">${location.trim()}</span>`);
+                });
+            }
+
+            if (typeof organizations === 'string' && organizations.trim() !== '') {
+                organizations.split(',').forEach(organization => {
+                    const regex = new RegExp(`\\b${organization.trim()}\\b`, 'gi');
+                    highlightedBody = highlightedBody.replace(regex, `<span class="highlight-pink">${organization.trim()}</span>`);
+                });
+            }
+
+            return highlightedBody;
+        }
+
+    // Function to add a tag
+    function addTag(articleId) {
+        const newTag = document.getElementById('newTag').value;
+        if (!newTag) {
+            alert('Please enter a tag.');
+            return;
+        }
+
+        fetch('/add_tags', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ article_id: articleId, tags: newTag })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert('Tag added successfully.');
+                window.location.reload();
+            } else {
+                alert('Error adding tag: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error adding tag:', error);
+            alert('Error adding tag.');
+        });
+    }
 
         // Function to select an article in the tree
         function selectArticle(article, li) {
@@ -1006,6 +1117,16 @@
                 if (!document.getElementById('showOrganizations').checked) {
                     row.cells[5].classList.add('hidden');
                 }
+
+                // Add the 'open' icon button
+                const actionsCell = row.insertCell(6);
+                const openIcon = document.createElement('i');
+                openIcon.className = 'fas fa-external-link-alt';
+                openIcon.style.cursor = 'pointer';
+                openIcon.onclick = function() {
+                    openArticleDetails(article);
+                };
+                actionsCell.appendChild(openIcon);
             });
         }
 

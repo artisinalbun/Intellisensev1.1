@@ -209,14 +209,6 @@ def get_scrapers():
         logging.error(f"Error fetching scraper files: {e}", exc_info=True)
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# Scrape articles
-@app.route('/scrape', methods=['GET'])
-def scrape():
-    logging.debug("Scraping articles")
-    category_url = 'https://apnews.com/business'
-    scraper_manager.scrape(category_url)
-    return "Scraping complete"
-
 # Load AP News Scraper
 @app.route('/load_scrapers', methods=['POST'])
 def load_scrapers():

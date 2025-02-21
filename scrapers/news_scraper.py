@@ -52,16 +52,20 @@ RETRY_CONFIG = {
 }
 
 device = 0 if torch.cuda.is_available() else -1
-ner_pipeline = pipeline("ner", grouped_entities=True, model="dslim/bert-base-NER", device=device)
+ner_pipeline = pipeline("ner", aggregation_strategy="simple", model="dslim/bert-base-NER", device=device)
 
 class NewsScraper(BaseScraper):  # Ensure the class name is correct
     def __init__(self):
         super().__init__()
-        self.base_url = "https://apnews.com/"
+        self._base_url = "https://apnews.com/"
         self.headers = {
             "User-Agent": random.choice(USER_AGENTS)
         }
         logging.debug(f"{self.__class__.__name__} initialized.")
+
+    @property
+    def base_url(self):
+        return self._base_url
 
     @retry(**RETRY_CONFIG)
     def fetch_page(self, url):

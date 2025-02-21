@@ -42,7 +42,8 @@ class Article(db.Model):
             "locations": self.locations,
             "organizations": self.organizations,
             "num_organizations": self.num_organizations,
-            "profiles": self.profiles
+            "profiles": self.profiles,
+            "tags": self.tags
         }
 
 class MapMarker(db.Model):
@@ -81,4 +82,3 @@ class Profile(db.Model):
     zip_code = db.Column(db.String(20))
     country = db.Column(db.String(100))
     person = db.relationship('People', backref=db.backref('profiles', lazy=True))
-        

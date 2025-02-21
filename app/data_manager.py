@@ -3,6 +3,8 @@ from app.models import DataEntry, Article
 from app.database import db
 from transformers import BertTokenizer
 import logging
+import threading
+from queue import Queue
 
 class DataManager:
     def __init__(self):
@@ -11,12 +13,14 @@ class DataManager:
         ])
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')  # Initialize tokenizer
         logging.debug("DataManager initialized with empty DataFrame")
-    
+
     def load_data_from_db(self):
         logging.debug("Loading data from database")
         data_entries = DataEntry.query.all()
-        data = [
-            {
+        data_queue = Queue()
+
+        def process_entry(entry):
+            data = {
                 'timestamp': entry.timestamp,
                 'location': entry.location,
                 'topic': entry.topic,
@@ -24,8 +28,21 @@ class DataManager:
                 'people': entry.people,
                 'other_data': entry.other_data
             }
-            for entry in data_entries
-        ]
+            data_queue.put(data)
+
+        threads = []
+        for entry in data_entries:
+            thread = threading.Thread(target=process_entry, args=(entry,))
+            thread.start()
+            threads.append(thread)
+
+        for thread in threads:
+            thread.join()
+
+        data = []
+        while not data_queue.empty():
+            data.append(data_queue.get())
+
         self.df = pd.DataFrame(data)
         logging.debug(f"Data loaded into DataFrame: {self.df}")
 
@@ -61,7 +78,6 @@ class DataManager:
     def tokenize_text(self, text):
         """Tokenize a single piece of text using the BERT tokenizer."""
         return self.tokenizer.encode(text, add_special_tokens=True)
-
 
     def get_dataframe(self):
         logging.debug(f"Returning DataFrame: {self.df}")

@@ -7,6 +7,8 @@ from app.models import db, MapMarker, Article
 from geoalchemy2 import WKTElement
 from shapely.geometry import Point
 from sqlalchemy import func
+import threading
+from queue import Queue
 
 # Load the Hugging Face NER pipeline
 device = 0 if torch.cuda.is_available() else -1  # Use GPU if available, otherwise CPU
@@ -35,7 +37,7 @@ def geocode_location(location_name, trace):
     
     params = {
         "address": location_name,
-        "key": "AIzaSyC2aRqT60uAdaeeUjcY7bB1V7E7fztKfII",  # Replace with your Google Maps API key
+        "key": "YOUR_GOOGLE_MAPS_API_KEY",  # Replace with your Google Maps API key
     }
 
     try:
@@ -95,17 +97,16 @@ def format_postgis_geometry(lat, lon):
     return f'SRID=4326;POINT({lon} {lat})'
 
 def remove_duplicate_articles():
-    # Delete duplicate articles from articles table
+    """Delete duplicate articles from the articles table."""
     db.session.query(Article).filter(
         Article.id.notin_(
             db.session.query(func.min(Article.id)).group_by(Article.headline, Article.body).having(func.count(Article.id) == 1)
         )
     ).delete(synchronize_session=False)
-
     db.session.commit()
 
 def remove_duplicate_map_markers():
-    # Delete duplicate map markers from map_markers table
+    """Delete duplicate map markers from the map_markers table."""
     db.session.query(MapMarker).filter(
         MapMarker.id.notin_(
             db.session.query(func.min(MapMarker.id)).group_by(
@@ -113,8 +114,10 @@ def remove_duplicate_map_markers():
             ).having(func.count(MapMarker.id) > 1)
         )
     ).delete(synchronize_session=False)
+    db.session.commit()
 
 def ensure_corresponding_map_markers():
+    """Ensure that every article has a corresponding map marker."""
     articles = Article.query.all()
     for article in articles:
         existing_marker = MapMarker.query.filter_by(article_id=article.id).first()
@@ -130,6 +133,7 @@ def ensure_corresponding_map_markers():
     db.session.commit()
 
 def update_map_marker_locations():
+    """Update the locations of map markers."""
     map_markers = MapMarker.query.all()
     for marker in map_markers:
         lon, lat = geocode_location(marker.name, Trace())
@@ -158,7 +162,7 @@ def repopulate_map_markers():
         logging.debug("Repopulated map markers from articles")
     else:
         logging.debug("Map markers table is not empty; skipping repopulation")
-        
+
 class Trace:
     def __init__(self):
         self.steps = []

@@ -1,10 +1,16 @@
+import threading
+from queue import Queue
 import importlib
 import logging
 from .base_scraper import BaseScraper  # Use relative import
+from app.models import db, Article, MapMarker
+from app.utils import geocode_location, validate_coordinates, format_postgis_geometry, Trace
+from geoalchemy2 import WKTElement
 
 class ScraperManager:
     def __init__(self):
         self.scrapers = []
+        self.results_queue = Queue()
         self.ml_model_active = False
 
     def load_scraper(self, scraper_name):
@@ -20,19 +26,27 @@ class ScraperManager:
             self.load_scraper(scraper_name)
         logging.info("All scrapers loaded")
 
+    def scrape_page(self, scraper, url):
+        articles = scraper.scrape(url)
+        self.results_queue.put(articles)
+
     def run_scrapers(self):
         all_articles = []
-        for scraper in self.scrapers:
-            articles = scraper.scrape(scraper.base_url)  # Call the scrape method of each scraper
-            if articles:  # Check if articles were returned
-                all_articles.extend(articles)
-                logging.info(f"Scraped {len(articles)} articles using {scraper.__class__.__name__}")
-            else:
-                logging.warning(f"No articles scraped by {scraper.__class__.__name__}")
+        threads = []
 
-        # Optionally, process the scraped articles further (e.g., save to the database)
+        for scraper in self.scrapers:
+            thread = threading.Thread(target=self.scrape_page, args=(scraper, scraper.base_url))
+            thread.start()
+            threads.append(thread)
+
+        for thread in threads:
+            thread.join()
+
+        while not self.results_queue.empty():
+            all_articles.extend(self.results_queue.get())
+
         if all_articles:
-            self.update_database(all_articles)  # Update the database with scraped articles
+            self.update_database(all_articles)
             logging.info(f"Total articles scraped: {len(all_articles)}")
         else:
             logging.warning("No articles scraped by any scraper.")
@@ -42,9 +56,9 @@ class ScraperManager:
         return run_model_on_articles(articles)
 
     def update_database(self, articles):
-        from app.models import db, Article, MapMarker
-        from app.utils import geocode_location, validate_coordinates, format_postgis_geometry, Trace
-        from geoalchemy2 import WKTElement
+        batch_size = 100
+        article_batch = []
+        map_marker_batch = []
 
         for article_data in articles:
             trace = Trace()
@@ -74,9 +88,7 @@ class ScraperManager:
                 num_organizations=len(organizations.split(', ')),
                 profiles=1
             )
-            db.session.add(new_article)
-            db.session.commit()
-            article_id = new_article.id
+            article_batch.append(new_article)
 
             if locations:
                 for location_name in locations.split(', '):
@@ -86,9 +98,20 @@ class ScraperManager:
                         new_map_marker = MapMarker(
                             name=location_name,
                             location=WKTElement(location, srid=4326),
-                            article_id=article_id
+                            article_id=new_article.id
                         )
-                        db.session.add(new_map_marker)
-                        db.session.commit()
+                        map_marker_batch.append(new_map_marker)
+
+            if len(article_batch) >= batch_size:
+                db.session.bulk_save_objects(article_batch)
+                db.session.bulk_save_objects(map_marker_batch)
+                db.session.commit()
+                article_batch.clear()
+                map_marker_batch.clear()
+
+        if article_batch:
+            db.session.bulk_save_objects(article_batch)
+            db.session.bulk_save_objects(map_marker_batch)
+            db.session.commit()
 
         logging.info("Database update complete.")

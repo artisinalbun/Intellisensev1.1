@@ -118,6 +118,7 @@ def remove_duplicate_map_markers():
 
 def ensure_corresponding_map_markers():
     """Ensure that every article has a corresponding map marker."""
+    logging.debug("Ensuring corresponding map markers for all articles...")
     articles = Article.query.all()
     for article in articles:
         existing_marker = MapMarker.query.filter_by(article_id=article.id).first()
@@ -131,9 +132,11 @@ def ensure_corresponding_map_markers():
                     new_marker = MapMarker(name=article.headline, location=location, article_id=article.id)
                     db.session.add(new_marker)
     db.session.commit()
+    logging.debug("Ensured corresponding map markers for all articles")
 
 def update_map_marker_locations():
     """Update the locations of map markers."""
+    logging.debug("Updating map marker locations...")
     map_markers = MapMarker.query.all()
     for marker in map_markers:
         lon, lat = geocode_location(marker.name, Trace())
@@ -142,9 +145,11 @@ def update_map_marker_locations():
             marker.location = location
             db.session.add(marker)
     db.session.commit()
+    logging.debug("Updated map marker locations")
 
 def repopulate_map_markers():
     """Repopulate the map_markers table from the articles table if necessary."""
+    logging.debug("Repopulating map markers from articles...")
     if MapMarker.query.count() == 0:  # Only repopulate if the table is empty
         articles = Article.query.all()
         for article in articles:

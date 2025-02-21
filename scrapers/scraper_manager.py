@@ -1,7 +1,5 @@
 import importlib
 import logging
-import threading
-from queue import Queue
 from .base_scraper import BaseScraper  # Use relative import
 
 class ScraperManager:

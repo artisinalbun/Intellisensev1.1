@@ -2,7 +2,7 @@ from flask import Flask
 from flask_cors import CORS
 from app.database import init_db, db
 from app.devflask import dev_app  # Import the developer tool blueprint
-from app.utils import update_map_marker_locations, repopulate_map_markers, ensure_corresponding_map_markers  # Import the repopulate function
+from app.utils import remove_duplicate_map_markers, ensure_corresponding_map_markers  # Import the necessary functions
 from app.models import MapMarker, Article  # Import Article model
 import logging
 from sqlalchemy import func
@@ -31,37 +31,22 @@ def create_app():
         app.register_blueprint(routes_blueprint, url_prefix='/app')
         logging.debug("Routes blueprint registered with prefix '/app'")
 
+        
         # Register the developer tool blueprint
         app.register_blueprint(dev_app, url_prefix='/dev')
         logging.debug("Developer tool blueprint registered with prefix '/dev'")
 
-        # Remove duplicate map markers
-        start_time = time.time()
-        db.session.query(MapMarker).filter(
-            MapMarker.id.notin_(
-                db.session.query(func.min(MapMarker.id)).group_by(MapMarker.name, MapMarker.article_id).having(func.count(MapMarker.id) > 1)
-            )
-        ).delete(synchronize_session=False)
-        db.session.commit()
-        logging.debug(f"Removed duplicate map markers in {time.time() - start_time:.2f} seconds")
+        # Check if map markers already exist
+        if MapMarker.query.count() == 0:
+            logging.debug("No map markers found, initializing...")
+            # Remove duplicate map markers
+            remove_duplicate_map_markers()
 
-        # Ensure corresponding map markers for all articles
-        start_time = time.time()
-        ensure_corresponding_map_markers()
-        logging.debug(f"Ensured corresponding map markers in {time.time() - start_time:.2f} seconds")
-
-        # Repopulate map markers from articles (only if necessary)
-        start_time = time.time()
-        if MapMarker.query.count() == 0 or Article.query.count() > MapMarker.query.count():
-            repopulate_map_markers()  # Call the repopulate function
-            logging.debug(f"Repopulated map markers from articles in {time.time() - start_time:.2f} seconds (if necessary)")
+            # Ensure corresponding map markers for all articles
+            ensure_corresponding_map_markers()
+            logging.debug("Ensured corresponding map markers for all articles")
         else:
-            logging.debug("Map markers table is not empty; skipping repopulation")
-
-        # Update map marker locations
-        start_time = time.time()
-        update_map_marker_locations()
-        logging.debug(f"Updated map marker locations in {time.time() - start_time:.2f} seconds")
+            logging.debug("Map markers already exist, skipping initialization")
 
         # Log all registered routes
         logging.debug("Registered routes:")

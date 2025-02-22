@@ -37,7 +37,7 @@ def geocode_location(location_name, trace):
     
     params = {
         "address": location_name,
-        "key": "YOUR_GOOGLE_MAPS_API_KEY",  # Replace with your Google Maps API key
+        "key": "AIzaSyC2aRqT60uAdaeeUjcY7bB1V7E7fztKfII"
     }
 
     try:
@@ -55,16 +55,19 @@ def geocode_location(location_name, trace):
                 result = data["results"][0]
                 lon = result["geometry"]["location"]["lng"]
                 lat = result["geometry"]["location"]["lat"]
+                logging.debug(f"Raw coordinates for {location_name}: ({lon}, {lat})")
                 if validate_coordinates(lon, lat, location_name):  # Validate coordinates before returning
                     trace.add_step(f"Geocoded coordinates for {location_name}", (lon, lat))
                     logging.debug(f"Geocoded coordinates: {lon}, {lat}")
                     return lon, lat
+                else:
+                    logging.debug(f"Coordinates validation failed for {location_name}: ({lon}, {lat})")
             else:
                 trace.add_step("No results found in Google Maps API response", data)
                 logging.debug("No results found in Google Maps API response")
         else:
             trace.add_step("Google Maps API returned an error", data)
-            logging.debug("Google Maps API error")
+            logging.debug(f"Google Maps API error: {data['status']}")
     except Exception as e:
         trace.add_step("Geocoding error", str(e))
         logging.error(f"Geocoding error: {e}")
@@ -84,11 +87,20 @@ def validate_coordinates(lon, lat, location_name):
     
     lower_name = location_name.lower()
     if "london" in lower_name:
-        return (-0.5 < lon < 0.5) and (51.0 < lat < 52.0)
+        valid = (-0.5 < lon < 0.5) and (51.0 < lat < 52.0)
+        if not valid:
+            logging.debug(f"Coordinates for London are invalid: ({lon}, {lat})")
+        return valid
     if "new york" in lower_name or "wall street" in lower_name:
-        return (-74.5 < lon < -73.5) and (40.5 < lat < 41.0)
+        valid = (-74.5 < lon < -73.5) and (40.5 < lat < 41.0)
+        if not valid:
+            logging.debug(f"Coordinates for New York are invalid: ({lon}, {lat})")
+        return valid
     if "washington" in lower_name or "federal reserve" in lower_name:
-        return (-77.5 < lon < -76.5) and (38.5 < lat < 39.0)
+        valid = (-77.5 < lon < -76.5) and (38.5 < lat < 39.0)
+        if not valid:
+            logging.debug(f"Coordinates for Washington are invalid: ({lon}, {lat})")
+        return valid
     
     return True
 
@@ -106,33 +118,66 @@ def remove_duplicate_articles():
     db.session.commit()
 
 def remove_duplicate_map_markers():
-    """Delete duplicate map markers from the map_markers table."""
-    db.session.query(MapMarker).filter(
-        MapMarker.id.notin_(
-            db.session.query(func.min(MapMarker.id)).group_by(
-                MapMarker.name, MapMarker.article_id
-            ).having(func.count(MapMarker.id) > 1)
-        )
-    ).delete(synchronize_session=False)
-    db.session.commit()
+    """Remove duplicate map markers from the map_markers table."""
+    logging.debug("Removing duplicate map markers...")
+    try:
+        # Find duplicate map markers based on name and article_id
+        subquery = db.session.query(
+            func.min(MapMarker.id).label('id')
+        ).group_by(MapMarker.name, MapMarker.article_id).subquery()
+
+        # Log the IDs that will be kept
+        unique_ids = [row.id for row in db.session.query(subquery)]
+        logging.debug(f"Unique map marker IDs to keep: {unique_ids}")
+
+        # Delete map markers that are not in the subquery
+        num_deleted = db.session.query(MapMarker).filter(
+            MapMarker.id.notin_(subquery)
+        ).delete(synchronize_session=False)
+
+        db.session.commit()
+        logging.debug(f"Duplicate map markers removed successfully. Number of map markers deleted: {num_deleted}")
+    except Exception as e:
+        logging.error(f"Error removing duplicate map markers: {e}")
+        db.session.rollback()
+
+is_ensuring_markers = False
 
 def ensure_corresponding_map_markers():
     """Ensure that every article has a corresponding map marker."""
-    logging.debug("Ensuring corresponding map markers for all articles...")
-    articles = Article.query.all()
-    for article in articles:
-        existing_marker = MapMarker.query.filter_by(article_id=article.id).first()
-        if not existing_marker:
-            locations = extract_locations(article.headline, article.body, Trace())
-            if locations:
-                location_name = locations[0]
-                lon, lat = geocode_location(location_name, Trace())
-                if lon and lat:
-                    location = format_postgis_geometry(lat, lon)
-                    new_marker = MapMarker(name=article.headline, location=location, article_id=article.id)
-                    db.session.add(new_marker)
-    db.session.commit()
-    logging.debug("Ensured corresponding map markers for all articles")
+    global is_ensuring_markers
+    if is_ensuring_markers:
+        logging.debug("ensure_corresponding_map_markers is already running; skipping")
+        return
+
+    is_ensuring_markers = True
+    try:
+        logging.debug("Ensuring corresponding map markers for all articles...")
+        articles = Article.query.all()
+        for article in articles:
+            existing_marker = MapMarker.query.filter_by(article_id=article.id).first()
+            if not existing_marker:
+                locations = extract_locations(article.headline, article.body, Trace())
+                if locations:
+                    location_name = locations[0]
+                    lon, lat = geocode_location(location_name, Trace())
+                    if lon and lat:
+                        location = format_postgis_geometry(lat, lon)
+                        logging.debug(f"Creating map marker for article: {article.id}")
+                        new_marker = MapMarker(name=article.headline, location=location, article_id=article.id)
+                        db.session.add(new_marker)
+                        logging.debug(f"Map marker created for article: {article.id}")
+                        try:
+                            db.session.commit()
+                            logging.debug(f"Map marker committed for article: {article.id}")
+                        except Exception as e:
+                            db.session.rollback()
+                            logging.error(f"Error committing map marker for article {article.id}: {e}")
+        logging.debug("Ensured corresponding map markers for all articles")
+    except Exception as e:
+        logging.error(f"Error in ensure_corresponding_map_markers: {e}")
+    finally:
+        is_ensuring_markers = False
 
 def update_map_marker_locations():
     """Update the locations of map markers."""

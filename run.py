@@ -1,9 +1,4 @@
-from flask import Flask
-from flask_cors import CORS
-from app import create_app
-import os
 import logging
-import time
 
 # Configure logging
 logging.basicConfig(
@@ -15,17 +10,37 @@ logging.basicConfig(
     ]
 )
 
+logging.debug("Logging is configured and working.")
+
+from flask import Flask
+from flask_cors import CORS
+from app import create_app
+import os
+import time
+from werkzeug.middleware.profiler import ProfilerMiddleware
+
 logging.debug("Starting application setup...")
 
-start_time = time.time()
-app = create_app()
-logging.debug(f"Application created in {time.time() - start_time:.2f} seconds")
+try:
+    app = create_app()
+    logging.debug("Application created successfully.")
+except Exception as e:
+    logging.error(f"Error during app creation: {e}")
+    raise
+
+# Enable profiling
+app.wsgi_app = ProfilerMiddleware(app.wsgi_app, restrictions=[30])
 
 @app.route('/')
 def index():
+    logging.debug("Handling request to '/' route")
     return "Main Application"
 
 if __name__ == '__main__':
     logging.debug("Starting Flask application...")
-    print(app.url_map)  # Add this line to print the URL map
-    app.run(debug=True)
+    try:
+        print(app.url_map)  # Add this line to print the URL map
+        app.run(debug=True)
+    except Exception as e:
+        logging.error(f"Error during app run: {e}")
+        raise
